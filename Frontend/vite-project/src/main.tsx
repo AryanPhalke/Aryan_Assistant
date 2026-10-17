@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { Provider } from 'react-redux'
 import { store } from '../redux/store.js'
 
+// Entry point: wraps the app in the Redux Provider so any component can read the store
 createRoot(document.getElementById('root')!).render(
   <Provider store={store}>
     <App />

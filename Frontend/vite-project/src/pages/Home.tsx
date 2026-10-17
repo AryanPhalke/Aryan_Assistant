@@ -3,35 +3,44 @@ import { signInWithPopup } from 'firebase/auth'
 import { auth, googleProvider } from '../../utils/firebase'
 import api from '../../utils/axios'
 import { useDispatch, useSelector } from 'react-redux'
+import {setUserdata} from '../../redux/userSlice.js'
 
 
+// Landing page. Shows a "Login with Google" popup until the user is logged in.
 function Home() {
+  // userData lives in the Redux store: null = logged out, object = logged in.
+  // It is filled by App.tsx when the page loads.
   const {userData} = useSelector(state=>state.user)
   const dispatch=useDispatch()
-  console.log("data fronm user: ",userData)
-    const handleLogin=async(token: string)=>{
+  console.log("[Home] Current user in Redux:", userData)
+
+  // Step 2 of login: send the Firebase token to our backend, which verifies it
+  // and sets the session cookie.
+  const handleLogin=async(token: string)=>{
     try{
       const {data} = await api.post("/api/auth/login", {token})
       dispatch(setUserdata)
-      console.log(data);
+      console.log("[Home] Backend login successful:", data);
     }
     catch(error){
-      console.log(error);
+      console.error("[Home] Backend login failed:", error);
     }
   }
+
+  // Step 1 of login: open the Google popup, then get a Firebase ID token
+  // (proof that Google confirmed who this user is).
   const googleLogin = async () => {
     const data = await signInWithPopup(auth, googleProvider)
     const token =await data.user.getIdToken();
-    console.log(token);
+    console.log("[Home] Google sign-in successful for:", data.user.email);
     await handleLogin(token);
-    console.log(data)
   }
   return (
     <div className='h-screen flex bg-[#0d0f14] text-white overflow-hidden'>
 {!userData && <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur'>
         <div className='w-[340px] bg-[#13151c] border border-white/[0.08] rounded-2xl p-7 flex flex-col gap-5'>
           <div className='flex flex-col gap-1'>
-            <h2 className='text-[17px] font-semibold text-slate-100 tracking-tight'>Welcome to CortexAI</h2>
+            <h2 className='text-[17px] font-semibold text-slate-100 tracking-tight'>Welcome to Aryan&apos;s Assistant</h2>
             <p className='text-[13px] text-slate-500'>Please login to continue using the app.</p>
           </div>
 
