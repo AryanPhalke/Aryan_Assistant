@@ -10,6 +10,7 @@
   "description": "",
   "type": "module",
   "dependencies": {
+    "cookie-parser": "^1.4.7",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
     "firebase-admin": "^14.5.0",
