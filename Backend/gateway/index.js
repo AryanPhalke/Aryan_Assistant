@@ -11,6 +11,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import protect from "./middleware/auth.middleware.js";
 import getCurrentUser from "./controllers/user.controller.js";
+import { proxyWithHeader } from "./utils/proxyWithHeader.js";
 
 // Load variables from .env into process.env (PORT, FORNTEND_URL, AUTH_Service, REDIS_URL)
 dotenv.config();
@@ -32,6 +33,8 @@ app.use(cookieParser());
 
 // Anything starting with /api/auth (login, logout) is forwarded to the auth service
 app.use("/api/auth", proxy(process.env.AUTH_Service));
+
+app.use("/api/chat", protect, proxyWithHeader(process.env.CHAT_Service));
 
 // Returns the logged-in user's info. `protect` runs first and blocks the
 // request unless a valid session exists in Redis.
