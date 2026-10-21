@@ -35,6 +35,7 @@ app.use(cookieParser());
 app.use("/api/auth", proxy(process.env.AUTH_Service));
 
 app.use("/api/chat", protect, proxyWithHeader(process.env.CHAT_Service));
+app.use("/api/agent", protect, proxy(process.env.AGENT_Service));
 
 // Returns the logged-in user's info. `protect` runs first and blocks the
 // request unless a valid session exists in Redis.
