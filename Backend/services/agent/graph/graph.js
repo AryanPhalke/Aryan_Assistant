@@ -49,6 +49,6 @@ workflow.addEdge("coding", END);
 workflow.addEdge("imageGen", END);
 workflow.addEdge("ppt", END);
 workflow.addEdge("pdf", END);
-workflow.addEdge("search", END);
+workflow.addEdge("search", "chat");
 
 export const graph = workflow.compile();
