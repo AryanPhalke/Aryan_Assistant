@@ -3,9 +3,11 @@ import { useState } from 'react'
 // Left sidebar: "New chat" button, a search box, the user's conversation list and a profile
 // row with a logout button at the bottom.
 // Fills its parent's width; Home sets the width and adds the resize handle.
-function SideBar({ conversations, activeId, onSelect, onNewChat, user, onLogout }) {
+function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user, onLogout }) {
   // Search box text; filters the list by title as you type
   const [query, setQuery] = useState('')
+  // Chat whose delete button was clicked once and is waiting for confirmation
+  const [confirmId, setConfirmId] = useState(null)
 
   const search = query.trim().toLowerCase()
   const filtered = search
@@ -70,19 +72,55 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, user, onLogout 
         {conversations.length > 0 && filtered.length === 0 && (
           <p className='px-3 py-2 text-[12px] text-slate-600'>No chats match &ldquo;{query.trim()}&rdquo;</p>
         )}
-        {filtered.map((c) => (
-          <button
-            key={c._id}
-            onClick={() => onSelect(c._id)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-[13px] truncate transition-colors cursor-pointer ${
-              c._id === activeId
-                ? 'bg-white/[0.08] text-slate-100'
-                : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
-            }`}
-          >
-            {c.title || 'New Chat'}
-          </button>
-        ))}
+        {filtered.map((c) => {
+          const confirming = confirmId === c._id
+          return (
+            <div
+              key={c._id}
+              // Leaving the row cancels a pending "Delete?" confirmation
+              onMouseLeave={() => confirming && setConfirmId(null)}
+              className={`group flex items-center rounded-lg transition-colors ${
+                c._id === activeId
+                  ? 'bg-white/[0.08] text-slate-100'
+                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
+              }`}
+            >
+              <button
+                onClick={() => onSelect(c._id)}
+                className='flex-1 min-w-0 text-left pl-3 py-2 text-[13px] truncate cursor-pointer'
+              >
+                {c.title || 'New Chat'}
+              </button>
+
+              {/* Delete: first click asks "Delete?", second click deletes */}
+              {confirming ? (
+                <button
+                  onClick={() => {
+                    setConfirmId(null)
+                    onDelete(c._id)
+                  }}
+                  className='shrink-0 mr-1.5 px-2 h-6 rounded-md bg-red-500/15 text-[11px] font-medium text-red-400 hover:bg-red-500/25 cursor-pointer'
+                >
+                  Delete?
+                </button>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(c._id)}
+                  title='Delete chat'
+                  className={`shrink-0 mr-1.5 w-6 h-6 flex items-center justify-center rounded-md text-slate-500 hover:text-red-400 hover:bg-white/[0.06] transition-opacity cursor-pointer ${
+                    c._id === activeId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+                  }`}
+                >
+                  <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                    <path d='M3 6h18' />
+                    <path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' />
+                    <path d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6' />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       {/* Logged-in user */}

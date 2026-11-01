@@ -84,6 +84,18 @@ function Home() {
     setArtifact(null)
   }
 
+  // Deletes a chat (and its messages) on the server, then removes it from the
+  // list. Deleting the open chat switches to a new empty chat.
+  const deleteConversation = async (id: string) => {
+    try {
+      await api.delete(`/api/chat/delete-conversation/${id}`)
+      setConversations((prev) => prev.filter((c) => c._id !== id))
+      if (id === activeId) startNewChat()
+    } catch (error) {
+      console.error('[Home] Failed to delete conversation:', error)
+    }
+  }
+
   const logout = async () => {
     try {
       await api.get('/api/auth/logout')
@@ -155,6 +167,7 @@ function Home() {
                 activeId={activeId}
                 onSelect={selectConversation}
                 onNewChat={startNewChat}
+                onDelete={deleteConversation}
                 user={userData}
                 onLogout={logout}
               />
