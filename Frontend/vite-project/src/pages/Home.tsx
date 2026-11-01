@@ -7,7 +7,9 @@ import { useDispatch, useSelector } from 'react-redux'
 import {setUserdata} from '../../redux/userSlice.js'
 import SideBar from '../components/SideBar.jsx'
 import ChatArea from '../components/ChatArea'
-import Artifact, { type ArtifactData, DEFAULT_ARTIFACT_WIDTH } from '../components/Artifact'
+import Artifact, { type ArtifactData } from '../components/Artifact'
+import ResizeHandle from '../components/ResizeHandle'
+import { ARTIFACT, MIN_CHAT, SIDEBAR, STRIP_WIDTH } from '../components/layout'
 
 type Conversation = { _id: string; title: string }
 
@@ -27,7 +29,19 @@ function Home() {
   // panel is open, and its width (changed by dragging its left edge)
   const [artifact, setArtifact] = useState<ArtifactData | null>(null)
   const [artifactOpen, setArtifactOpen] = useState(false)
-  const [artifactWidth, setArtifactWidth] = useState(DEFAULT_ARTIFACT_WIDTH)
+  const [artifactWidth, setArtifactWidth] = useState(ARTIFACT.default)
+
+  // Sidebar: open/collapsed, width (changed by dragging its right edge), and
+  // whether it's being dragged (to dim it near the collapse point)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR.default)
+  const [sidebarDragging, setSidebarDragging] = useState(false)
+
+  // Each panel can only grow until the chat in the middle hits MIN_CHAT
+  const sidebarSpace = sidebarOpen ? sidebarWidth : STRIP_WIDTH
+  const artifactSpace = artifactOpen ? artifactWidth : STRIP_WIDTH
+  const sidebarMax = Math.min(SIDEBAR.max, window.innerWidth - artifactSpace - MIN_CHAT)
+  const artifactMax = window.innerWidth - sidebarSpace - MIN_CHAT
 
   // Called by ChatArea when a reply has code (or the user clicks "Open")
   const openArtifact = (data: ArtifactData) => {
@@ -129,14 +143,61 @@ function Home() {
 
       {userData && (
         <>
-          <SideBar
-            conversations={conversations}
-            activeId={activeId}
-            onSelect={selectConversation}
-            onNewChat={startNewChat}
-            user={userData}
-            onLogout={logout}
-          />
+          {sidebarOpen ? (
+            <div
+              style={{ width: sidebarWidth }}
+              className={`relative shrink-0 h-full ${
+                sidebarDragging && sidebarWidth < SIDEBAR.collapseAt ? 'opacity-50' : ''
+              }`}
+            >
+              <SideBar
+                conversations={conversations}
+                activeId={activeId}
+                onSelect={selectConversation}
+                onNewChat={startNewChat}
+                user={userData}
+                onLogout={logout}
+              />
+              {/* Drag the right edge to resize; nearly shut collapses to the strip */}
+              <ResizeHandle
+                side='right'
+                width={sidebarWidth}
+                min={SIDEBAR.min}
+                max={sidebarMax}
+                collapseAt={SIDEBAR.collapseAt}
+                defaultWidth={SIDEBAR.default}
+                onResize={setSidebarWidth}
+                onCollapse={() => setSidebarOpen(false)}
+                dragging={sidebarDragging}
+                onDraggingChange={setSidebarDragging}
+              />
+            </div>
+          ) : (
+            // Collapsed: a slim strip on the left edge with "new chat" and a
+            // button that opens the sidebar again
+            <div
+              style={{ width: STRIP_WIDTH }}
+              className='shrink-0 h-full flex flex-col items-center border-r border-white/[0.06] bg-[#0a0c10]'
+            >
+              <button
+                onClick={startNewChat}
+                title='New chat'
+                className='mt-3 w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.08] text-[16px] text-slate-300 hover:bg-white/[0.05] transition-colors cursor-pointer'
+              >
+                +
+              </button>
+              <button
+                onClick={() => setSidebarOpen(true)}
+                title='Open chats'
+                className='flex-1 w-full flex flex-col items-center justify-center gap-3 text-slate-500 hover:text-slate-200 hover:bg-white/[0.03] transition-colors cursor-pointer'
+              >
+                <span className='text-[11px] font-medium tracking-wider uppercase [writing-mode:vertical-rl] rotate-180'>
+                  Chats
+                </span>
+                <span className='text-[14px]'>›</span>
+              </button>
+            </div>
+          )}
           <ChatArea
             conversationId={activeId}
             ensureConversation={ensureConversation}
@@ -147,6 +208,7 @@ function Home() {
               key={artifact ? `${artifact.active}:${artifact.files.map((f) => `${f.fileName}:${f.code.length}`).join('|')}` : 'empty'}
               artifact={artifact}
               width={artifactWidth}
+              maxWidth={artifactMax}
               onResize={setArtifactWidth}
               onClose={() => setArtifactOpen(false)}
             />
@@ -155,7 +217,8 @@ function Home() {
             <button
               onClick={() => setArtifactOpen(true)}
               title='Open artifacts'
-              className='w-10 shrink-0 h-full flex flex-col items-center justify-center gap-3 border-l border-white/[0.06] bg-[#0a0c10] text-slate-500 hover:text-slate-200 hover:bg-white/[0.03] transition-colors cursor-pointer'
+              style={{ width: STRIP_WIDTH }}
+              className='shrink-0 h-full flex flex-col items-center justify-center gap-3 border-l border-white/[0.06] bg-[#0a0c10] text-slate-500 hover:text-slate-200 hover:bg-white/[0.03] transition-colors cursor-pointer'
             >
               <span className='text-[14px]'>‹</span>
               <span className='text-[11px] font-medium tracking-wider uppercase [writing-mode:vertical-rl] rotate-180'>

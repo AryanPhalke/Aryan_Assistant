@@ -1,8 +1,9 @@
 // Left sidebar: "New chat" button, the user's conversation list and a profile
 // row with a logout button at the bottom.
+// Fills its parent's width; Home sets the width and adds the resize handle.
 function SideBar({ conversations, activeId, onSelect, onNewChat, user, onLogout }) {
   return (
-    <aside className='w-[260px] shrink-0 h-full flex flex-col bg-[#0a0c10] border-r border-white/[0.06]'>
+    <aside className='w-full h-full flex flex-col bg-[#0a0c10] border-r border-white/[0.06]'>
       <div className='p-3'>
         <button
           onClick={onNewChat}

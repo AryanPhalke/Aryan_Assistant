@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
+import ResizeHandle from './ResizeHandle'
+import { ARTIFACT } from './layout'
 
 export type ArtifactFile = {
   language: string
@@ -18,18 +20,12 @@ type Props = {
   artifact: ArtifactData | null
   // Panel width in px; changed by dragging the left edge
   width: number
+  // Widest the panel may get (Home works it out from the sidebar width)
+  maxWidth: number
   onResize: (width: number) => void
   // Collapses the panel back to the strip on the right edge
   onClose: () => void
 }
-
-// Drag limits: below COLLAPSE_AT the panel snaps shut on release; MIN_CHAT
-// keeps room for the chat (sidebar is 260px)
-export const DEFAULT_ARTIFACT_WIDTH = 560
-const MIN_WIDTH = 320
-const COLLAPSE_AT = 240
-const SIDEBAR_WIDTH = 260
-const MIN_CHAT = 360
 
 // File extension for names when the reply had no file name
 const EXTENSIONS: Record<string, string> = {
@@ -84,41 +80,8 @@ const iconButton =
 // Right-hand panel. Shows the artifact (files + live preview) or, when
 // nothing has been generated yet, a "Nothing to preview" message.
 // Drag the left edge to resize; drag it almost shut to collapse to the strip.
-function Artifact({ artifact, width, onResize, onClose }: Props) {
-  // Where the drag started: pointer x and panel width at that moment
-  const dragStart = useRef<{ x: number; width: number } | null>(null)
+function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
   const [dragging, setDragging] = useState(false)
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Stop the browser from selecting chat text while dragging, and keep
-    // receiving move events even when the pointer leaves the handle
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragStart.current = { x: e.clientX, width }
-    setDragging(true)
-  }
-
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart.current) return
-    // The handle is on the left edge, so moving left makes the panel wider
-    const next = dragStart.current.width + (dragStart.current.x - e.clientX)
-    const max = window.innerWidth - SIDEBAR_WIDTH - MIN_CHAT
-    // Allow going below MIN_WIDTH while dragging so the user can see it closing
-    onResize(Math.max(COLLAPSE_AT - 40, Math.min(next, max)))
-  }
-
-  const onPointerUp = () => {
-    if (!dragStart.current) return
-    dragStart.current = null
-    setDragging(false)
-    if (width < COLLAPSE_AT) {
-      // Dragged nearly shut: collapse, and reopen at the default size next time
-      onClose()
-      onResize(DEFAULT_ARTIFACT_WIDTH)
-    } else if (width < MIN_WIDTH) {
-      onResize(MIN_WIDTH)
-    }
-  }
 
   // Close button, shown at the right of the header in both states
   const controls = (
@@ -131,24 +94,22 @@ function Artifact({ artifact, width, onResize, onClose }: Props) {
     <aside
       style={{ width }}
       className={`relative shrink-0 h-full flex flex-col bg-[#13151c] border-l border-white/[0.08] ${
-        dragging && width < COLLAPSE_AT ? 'opacity-50' : ''
+        dragging && width < ARTIFACT.collapseAt ? 'opacity-50' : ''
       }`}
     >
-      {/* Drag handle on the left edge */}
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        title='Drag to resize'
-        className='group absolute -left-1 top-0 z-20 h-full w-2 cursor-col-resize'
-      >
-        <div
-          className={`mx-auto h-full w-0.5 transition-colors ${
-            dragging ? 'bg-indigo-400' : 'bg-transparent group-hover:bg-indigo-400/60'
-          }`}
-        />
-      </div>
+      {/* Drag the left edge to resize; nearly shut collapses to the strip */}
+      <ResizeHandle
+        side='left'
+        width={width}
+        min={ARTIFACT.min}
+        max={maxWidth}
+        collapseAt={ARTIFACT.collapseAt}
+        defaultWidth={ARTIFACT.default}
+        onResize={onResize}
+        onCollapse={onClose}
+        dragging={dragging}
+        onDraggingChange={setDragging}
+      />
 
       {/* While dragging, cover the panel so the preview iframe doesn't swallow
           pointer events, and stop text from being selected */}
