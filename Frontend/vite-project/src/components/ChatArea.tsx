@@ -17,19 +17,36 @@ type Props = {
   onOpenArtifact: (artifact: ArtifactData) => void
 }
 
-// Splits a reply into plain text and ```fenced``` code blocks
+type Part = { type: 'text' | 'code'; content: string; language: string; fileName?: string }
+
+// Splits a reply into plain text and ```fenced``` code blocks.
+// The coding agent labels blocks as ```language:fileName (e.g. ```html:index.html)
 const splitCodeBlocks = (text: string) => {
-  const parts: { type: 'text' | 'code'; content: string; language: string }[] = []
-  const fence = /```(\w*)\n?([\s\S]*?)```/g
+  const parts: Part[] = []
+  const fence = /```([^\n`]*)\n?([\s\S]*?)```/g
   let last = 0
   let match
   while ((match = fence.exec(text)) !== null) {
     if (match.index > last) parts.push({ type: 'text', content: text.slice(last, match.index), language: '' })
-    parts.push({ type: 'code', content: match[2].trimEnd(), language: match[1] })
+    const [language, fileName] = match[1].trim().split(':')
+    parts.push({ type: 'code', content: match[2].trimEnd(), language: language ?? '', fileName: fileName?.trim() || undefined })
     last = fence.lastIndex
   }
   if (last < text.length) parts.push({ type: 'text', content: text.slice(last), language: '' })
   return parts
+}
+
+// Turns every code block in a reply into an artifact (one tab per file).
+// `partIndex` is the clicked block's index in splitCodeBlocks(), so that file
+// is selected; returns null when the reply has no code
+const toArtifact = (text: string, partIndex?: number): ArtifactData | null => {
+  const parts = splitCodeBlocks(text)
+  const files = parts
+    .filter((p) => p.type === 'code')
+    .map((p) => ({ language: p.language, code: p.content, fileName: p.fileName }))
+  if (files.length === 0) return null
+  const active = partIndex === undefined ? 0 : parts.slice(0, partIndex).filter((p) => p.type === 'code').length
+  return { files, active }
 }
 
 // Agents the user can pick. `id` must match the node names in the agent
@@ -39,7 +56,7 @@ const AGENTS = [
   { id: 'auto', label: 'Auto', ready: true },
   { id: 'chat', label: 'Chat', ready: true },
   { id: 'search', label: 'Search', ready: false },
-  { id: 'coding', label: 'Coding', ready: false },
+  { id: 'coding', label: 'Coding', ready: true },
   { id: 'pdf', label: 'PDF', ready: false },
   { id: 'ppt', label: 'Slides', ready: false },
   { id: 'imageGen', label: 'Image', ready: false },
@@ -91,11 +108,12 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
       skipNextLoad.current = false
       return
     }
-    if (!conversationId) {
-      setMessages([])
-      return
-    }
     const load = async () => {
+      // "New chat": start with an empty message list
+      if (!conversationId) {
+        setMessages([])
+        return
+      }
       try {
         const { data } = await api.get(`/api/chat/get-messages/${conversationId}`)
         // The chat service returns newest first; show oldest at the top
@@ -132,7 +150,12 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
         conversationId: id,
         ...(agent !== 'auto' && { agent }),
       })
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.aiResponse ?? '' }])
+      const reply: string = data.aiResponse ?? ''
+      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
+
+      // Coding replies open all their files in the artifact panel automatically
+      const artifact = data.agent === 'coding' ? toArtifact(reply) : null
+      if (artifact) onOpenArtifact(artifact)
     } catch (error) {
       console.error('[ChatArea] Agent request failed:', error)
       setMessages((prev) => [
@@ -178,9 +201,12 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
                       ) : (
                         <div key={j} className='my-2 rounded-xl border border-white/[0.08] bg-[#13151c] overflow-hidden'>
                           <div className='flex items-center justify-between px-3 h-8 border-b border-white/[0.06]'>
-                            <span className='text-[11px] font-mono text-slate-500'>{part.language || 'code'}</span>
+                            <span className='text-[11px] font-mono text-slate-500'>{part.fileName || part.language || 'code'}</span>
                             <button
-                              onClick={() => onOpenArtifact({ language: part.language, code: part.content })}
+                              onClick={() => {
+                                const artifact = toArtifact(m.content ?? '', j)
+                                if (artifact) onOpenArtifact(artifact)
+                              }}
                               className='text-[11px] text-slate-400 hover:text-slate-100 transition-colors cursor-pointer'
                             >
                               Open

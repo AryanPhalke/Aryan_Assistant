@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signInWithPopup } from 'firebase/auth'
 
 import { auth, googleProvider } from '../../utils/firebase'
@@ -26,18 +26,18 @@ function Home() {
   const [artifact, setArtifact] = useState<ArtifactData | null>(null)
 
   // Load the user's conversations once they are logged in
-  const loadConversations = useCallback(async () => {
-    try {
-      const { data } = await api.get('/api/chat/get-conversation')
-      setConversations(data)
-    } catch (error) {
-      console.error('[Home] Failed to load conversations:', error)
-    }
-  }, [])
-
   useEffect(() => {
-    if (userData) loadConversations()
-  }, [userData, loadConversations])
+    if (!userData) return
+    const loadConversations = async () => {
+      try {
+        const { data } = await api.get('/api/chat/get-conversation')
+        setConversations(data)
+      } catch (error) {
+        console.error('[Home] Failed to load conversations:', error)
+      }
+    }
+    loadConversations()
+  }, [userData])
 
   // Called by ChatArea on the first message of a new chat: create the
   // conversation and name it after the first prompt
@@ -132,7 +132,13 @@ function Home() {
             ensureConversation={ensureConversation}
             onOpenArtifact={setArtifact}
           />
-          {artifact && <Artifact artifact={artifact} onClose={() => setArtifact(null)} />}
+          {artifact && (
+            <Artifact
+              key={`${artifact.active}:${artifact.files.map((f) => `${f.fileName}:${f.code.length}`).join('|')}`}
+              artifact={artifact}
+              onClose={() => setArtifact(null)}
+            />
+          )}
         </>
       )}
     </div>
