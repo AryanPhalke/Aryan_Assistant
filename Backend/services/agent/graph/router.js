@@ -48,6 +48,11 @@ Examples:
 Reply with ONLY the agent name, exactly as written above. No explanation, no punctuation.`;
 
 export const router = async (state) => {
+  // The user picked an agent in the UI: use it and skip the LLM call
+  if (AGENTS.includes(state.agent)) {
+    return { agent: state.agent };
+  }
+
   const llm = getModel("router");
 
   try {

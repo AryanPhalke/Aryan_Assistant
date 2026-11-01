@@ -1,12 +1,19 @@
+import { useCallback, useEffect, useState } from 'react'
 import { signInWithPopup } from 'firebase/auth'
 
 import { auth, googleProvider } from '../../utils/firebase'
 import api from '../../utils/axios'
 import { useDispatch, useSelector } from 'react-redux'
 import {setUserdata} from '../../redux/userSlice.js'
+import SideBar from '../components/SideBar.jsx'
+import ChatArea from '../components/ChatArea'
+import Artifact, { type ArtifactData } from '../components/Artifact'
+
+type Conversation = { _id: string; title: string }
 
 
-// Landing page. Shows a "Login with Google" popup until the user is logged in.
+// Landing page. Shows a "Login with Google" popup until the user is logged in,
+// then the chat layout: sidebar | chat | (optional) artifact panel.
 function Home() {
   // userData lives in the Redux store: null = logged out, object = logged in.
   // It is filled by App.tsx when the page loads.
@@ -14,12 +21,63 @@ function Home() {
   const dispatch=useDispatch()
   console.log("[Home] Current user in Redux:", userData)
 
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [artifact, setArtifact] = useState<ArtifactData | null>(null)
+
+  // Load the user's conversations once they are logged in
+  const loadConversations = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/chat/get-conversation')
+      setConversations(data)
+    } catch (error) {
+      console.error('[Home] Failed to load conversations:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (userData) loadConversations()
+  }, [userData, loadConversations])
+
+  // Called by ChatArea on the first message of a new chat: create the
+  // conversation and name it after the first prompt
+  const ensureConversation = async (firstPrompt: string) => {
+    const { data } = await api.post('/api/chat/create-conversation')
+    const title = firstPrompt.length > 40 ? `${firstPrompt.slice(0, 40)}...` : firstPrompt
+    const { data: updated } = await api.post('/api/chat/update-conversation', { id: data._id, title })
+    setConversations((prev) => [updated ?? data, ...prev])
+    setActiveId(data._id)
+    return data._id as string
+  }
+
+  const startNewChat = () => {
+    setActiveId(null)
+    setArtifact(null)
+  }
+
+  const selectConversation = (id: string) => {
+    setActiveId(id)
+    setArtifact(null)
+  }
+
+  const logout = async () => {
+    try {
+      await api.get('/api/auth/logout')
+    } catch (error) {
+      console.error('[Home] Logout failed:', error)
+    }
+    dispatch(setUserdata(null))
+    setConversations([])
+    setActiveId(null)
+    setArtifact(null)
+  }
+
   // Step 2 of login: send the Firebase token to our backend, which verifies it
   // and sets the session cookie.
   const handleLogin=async(token: string)=>{
     try{
       const {data} = await api.post("/api/auth/login", {token})
-      dispatch(setUserdata)
+      dispatch(setUserdata(data))
       console.log("[Home] Backend login successful:", data);
     }
     catch(error){
@@ -59,7 +117,24 @@ function Home() {
         </div>
       </div>}
 
-      
+      {userData && (
+        <>
+          <SideBar
+            conversations={conversations}
+            activeId={activeId}
+            onSelect={selectConversation}
+            onNewChat={startNewChat}
+            user={userData}
+            onLogout={logout}
+          />
+          <ChatArea
+            conversationId={activeId}
+            ensureConversation={ensureConversation}
+            onOpenArtifact={setArtifact}
+          />
+          {artifact && <Artifact artifact={artifact} onClose={() => setArtifact(null)} />}
+        </>
+      )}
     </div>
   )
 }

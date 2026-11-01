@@ -37,8 +37,20 @@ export const chatAgent = async (state) => {
   const llm = getModel("chat");
 
   try {
+    // Earlier messages give the model memory of this conversation
+    const history = (state.history ?? []).map((m) => [
+      m.role === "user" ? "human" : "ai",
+      m.content,
+    ]);
+
+    // Tell the model who it's talking to, in every conversation
+    const systemPrompt = state.userName
+      ? `${CHAT_SYSTEM_PROMPT}\n\nThe user's name is ${state.userName}. Use it naturally when it fits, but don't overuse it.`
+      : CHAT_SYSTEM_PROMPT;
+
     const response = await llm.invoke([
-      ["system", CHAT_SYSTEM_PROMPT],
+      ["system", systemPrompt],
+      ...history,
       ["human", state.prompt],
     ]);
 
