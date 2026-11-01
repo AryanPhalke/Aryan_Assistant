@@ -10,8 +10,15 @@ import ChatArea from '../components/ChatArea'
 import Artifact, { type ArtifactData } from '../components/Artifact'
 import ResizeHandle from '../components/ResizeHandle'
 import { ARTIFACT, MIN_CHAT, SIDEBAR, STRIP_WIDTH } from '../components/layout'
+import { Button, IconButton } from '../components/ui/Button'
+import { VerticalLabel } from '../components/ui/VerticalLabel'
+import { cn } from '../components/ui/cn'
 
 type Conversation = { _id: string; title: string }
+
+// Clickable area of a collapsed strip ("Chats ›" / "‹ Artifacts")
+const stripButton =
+  'flex flex-col items-center justify-center gap-3 text-slate-500 hover:text-slate-200 hover:bg-white/3 transition-colors cursor-pointer'
 
 
 // Landing page. Shows a "Login with Google" popup until the user is logged in,
@@ -130,18 +137,15 @@ function Home() {
     await handleLogin(token);
   }
   return (
-    <div className='h-screen flex bg-[#0d0f14] text-white overflow-hidden'>
+    <div className='h-screen flex bg-app text-white overflow-hidden'>
 {!userData && <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur'>
-        <div className='w-[340px] bg-[#13151c] border border-white/[0.08] rounded-2xl p-7 flex flex-col gap-5'>
+        <div className='w-85 bg-panel border border-line rounded-2xl p-7 flex flex-col gap-5'>
           <div className='flex flex-col gap-1'>
             <h2 className='text-[17px] font-semibold text-slate-100 tracking-tight'>Welcome to Aryan&apos;s Assistant</h2>
             <p className='text-[13px] text-slate-500'>Please login to continue using the app.</p>
           </div>
 
-          <button
-            onClick={googleLogin}
-            className='w-full h-11 flex items-center justify-center gap-3 rounded-xl bg-white text-[14px] font-medium text-slate-900 hover:bg-slate-200 transition-colors cursor-pointer'
-          >
+          <Button onClick={googleLogin} className='w-full h-11 gap-3 text-[14px]'>
             <svg width='18' height='18' viewBox='0 0 48 48'>
               <path fill='#EA4335' d='M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z'/>
               <path fill='#4285F4' d='M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z'/>
@@ -149,7 +153,7 @@ function Home() {
               <path fill='#34A853' d='M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z'/>
             </svg>
             Continue with Google
-          </button>
+          </Button>
         </div>
       </div>}
 
@@ -158,9 +162,7 @@ function Home() {
           {sidebarOpen ? (
             <div
               style={{ width: sidebarWidth }}
-              className={`relative shrink-0 h-full ${
-                sidebarDragging && sidebarWidth < SIDEBAR.collapseAt ? 'opacity-50' : ''
-              }`}
+              className={cn('relative shrink-0 h-full', sidebarDragging && sidebarWidth < SIDEBAR.collapseAt && 'opacity-50')}
             >
               <SideBar
                 conversations={conversations}
@@ -190,23 +192,17 @@ function Home() {
             // button that opens the sidebar again
             <div
               style={{ width: STRIP_WIDTH }}
-              className='shrink-0 h-full flex flex-col items-center border-r border-white/[0.06] bg-[#0a0c10]'
+              className='shrink-0 h-full flex flex-col items-center border-r border-line-soft bg-sidebar'
             >
-              <button
+              <IconButton
                 onClick={startNewChat}
                 title='New chat'
-                className='mt-3 w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.08] text-[16px] text-slate-300 hover:bg-white/[0.05] transition-colors cursor-pointer'
+                className='mt-3 w-8 h-8 border border-line text-[16px] text-slate-300 hover:bg-white/5'
               >
                 +
-              </button>
-              <button
-                onClick={() => setSidebarOpen(true)}
-                title='Open chats'
-                className='flex-1 w-full flex flex-col items-center justify-center gap-3 text-slate-500 hover:text-slate-200 hover:bg-white/[0.03] transition-colors cursor-pointer'
-              >
-                <span className='text-[11px] font-medium tracking-wider uppercase [writing-mode:vertical-rl] rotate-180'>
-                  Chats
-                </span>
+              </IconButton>
+              <button onClick={() => setSidebarOpen(true)} title='Open chats' className={cn(stripButton, 'flex-1 w-full')}>
+                <VerticalLabel>Chats</VerticalLabel>
                 <span className='text-[14px]'>›</span>
               </button>
             </div>
@@ -231,12 +227,10 @@ function Home() {
               onClick={() => setArtifactOpen(true)}
               title='Open artifacts'
               style={{ width: STRIP_WIDTH }}
-              className='shrink-0 h-full flex flex-col items-center justify-center gap-3 border-l border-white/[0.06] bg-[#0a0c10] text-slate-500 hover:text-slate-200 hover:bg-white/[0.03] transition-colors cursor-pointer'
+              className={cn(stripButton, 'shrink-0 h-full border-l border-line-soft bg-sidebar')}
             >
               <span className='text-[14px]'>‹</span>
-              <span className='text-[11px] font-medium tracking-wider uppercase [writing-mode:vertical-rl] rotate-180'>
-                Artifacts
-              </span>
+              <VerticalLabel>Artifacts</VerticalLabel>
               {/* Dot = something is ready to view */}
               {artifact && <span className='w-1.5 h-1.5 rounded-full bg-indigo-400' />}
             </button>

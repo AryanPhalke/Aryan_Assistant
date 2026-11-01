@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+/* App colours, used as Tailwind classes: bg-app, bg-panel, bg-sidebar,
+   border-line, border-line-soft. Change them here to retheme the whole app. */
+@theme {
+  --color-app: #0d0f14;          /* page background (chat area) */
+  --color-panel: #13151c;        /* cards, artifact panel, input box */
+  --color-sidebar: #0a0c10;      /* sidebar and collapsed strips */
+  --color-line: rgb(255 255 255 / 0.08);       /* default borders */
+  --color-line-soft: rgb(255 255 255 / 0.06);  /* subtle dividers */
+}

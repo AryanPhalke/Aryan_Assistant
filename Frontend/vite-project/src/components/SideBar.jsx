@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Button, IconButton } from './ui/Button'
+import { cn } from './ui/cn'
 
 // Left sidebar: "New chat" button, a search box, the user's conversation list and a profile
 // row with a logout button at the bottom.
@@ -15,15 +17,12 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user,
     : conversations
 
   return (
-    <aside className='w-full h-full flex flex-col bg-[#0a0c10] border-r border-white/[0.06]'>
+    <aside className='w-full h-full flex flex-col bg-sidebar border-r border-line-soft'>
       <div className='p-3 flex flex-col gap-2'>
-        <button
-          onClick={onNewChat}
-          className='w-full h-10 flex items-center gap-2 px-3 rounded-xl border border-white/[0.08] text-[13px] font-medium text-slate-200 hover:bg-white/[0.05] transition-colors cursor-pointer'
-        >
+        <Button variant='outline' onClick={onNewChat} className='w-full justify-start'>
           <span className='text-[16px] leading-none'>+</span>
           New chat
-        </button>
+        </Button>
 
         {/* Search */}
         <div className='relative'>
@@ -46,16 +45,16 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user,
             // Esc clears the search
             onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
             placeholder='Search chats'
-            className='w-full h-9 pl-8 pr-8 rounded-lg bg-white/[0.04] border border-transparent text-[13px] text-slate-200 placeholder:text-slate-600 outline-none focus:border-white/[0.12] transition-colors'
+            className='w-full h-9 pl-8 pr-8 rounded-lg bg-white/4 border border-transparent text-[13px] text-slate-200 placeholder:text-slate-600 outline-none focus:border-white/12 transition-colors'
           />
           {query && (
-            <button
+            <IconButton
               onClick={() => setQuery('')}
               title='Clear search'
-              className='absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded text-[11px] text-slate-500 hover:text-slate-200 cursor-pointer'
+              className='absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded text-[11px] text-slate-500 hover:bg-transparent hover:text-slate-200'
             >
               ✕
-            </button>
+            </IconButton>
           )}
         </div>
       </div>
@@ -79,11 +78,10 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user,
               key={c._id}
               // Leaving the row cancels a pending "Delete?" confirmation
               onMouseLeave={() => confirming && setConfirmId(null)}
-              className={`group flex items-center rounded-lg transition-colors ${
-                c._id === activeId
-                  ? 'bg-white/[0.08] text-slate-100'
-                  : 'text-slate-400 hover:bg-white/[0.04] hover:text-slate-200'
-              }`}
+              className={cn(
+                'group flex items-center rounded-lg transition-colors',
+                c._id === activeId ? 'bg-white/8 text-slate-100' : 'text-slate-400 hover:bg-white/4 hover:text-slate-200',
+              )}
             >
               <button
                 onClick={() => onSelect(c._id)}
@@ -104,19 +102,20 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user,
                   Delete?
                 </button>
               ) : (
-                <button
+                <IconButton
                   onClick={() => setConfirmId(c._id)}
                   title='Delete chat'
-                  className={`shrink-0 mr-1.5 w-6 h-6 flex items-center justify-center rounded-md text-slate-500 hover:text-red-400 hover:bg-white/[0.06] transition-opacity cursor-pointer ${
-                    c._id === activeId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
-                  }`}
+                  className={cn(
+                    'mr-1.5 w-6 h-6 rounded-md text-slate-500 hover:text-red-400 transition-opacity',
+                    c._id === activeId ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100',
+                  )}
                 >
                   <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
                     <path d='M3 6h18' />
                     <path d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' />
                     <path d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6' />
                   </svg>
-                </button>
+                </IconButton>
               )}
             </div>
           )
@@ -125,7 +124,7 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user,
 
       {/* Logged-in user */}
       {user && (
-        <div className='p-3 border-t border-white/[0.06] flex items-center gap-3'>
+        <div className='p-3 border-t border-line-soft flex items-center gap-3'>
           {user.avatar ? (
             <img src={user.avatar} alt='' referrerPolicy='no-referrer' className='w-8 h-8 rounded-full' />
           ) : (
@@ -137,13 +136,9 @@ function SideBar({ conversations, activeId, onSelect, onNewChat, onDelete, user,
             <p className='text-[13px] text-slate-200 truncate'>{user.name}</p>
             <p className='text-[11px] text-slate-500 truncate'>{user.email}</p>
           </div>
-          <button
-            onClick={onLogout}
-            title='Log out'
-            className='text-[12px] text-slate-500 hover:text-slate-200 transition-colors cursor-pointer'
-          >
+          <Button variant='link' onClick={onLogout} title='Log out' className='text-slate-500 hover:text-slate-200'>
             Log out
-          </button>
+          </Button>
         </div>
       )}
     </aside>

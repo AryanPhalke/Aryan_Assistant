@@ -3,6 +3,8 @@ import api from '../../utils/axios'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ArtifactData } from './Artifact'
+import { Button } from './ui/Button'
+import { cn } from './ui/cn'
 
 type Message = {
   _id?: string
@@ -77,18 +79,18 @@ const markdownComponents: Components = {
       {children}
     </a>
   ),
-  blockquote: ({ children }) => <blockquote className='border-l-2 border-white/[0.15] pl-3 my-2 text-slate-400'>{children}</blockquote>,
-  hr: () => <hr className='my-4 border-white/[0.08]' />,
+  blockquote: ({ children }) => <blockquote className='border-l-2 border-white/15 pl-3 my-2 text-slate-400'>{children}</blockquote>,
+  hr: () => <hr className='my-4 border-line' />,
   // Inline `code`
-  code: ({ children }) => <code className='px-1.5 py-0.5 rounded bg-white/[0.08] text-[13px] font-mono text-slate-100'>{children}</code>,
+  code: ({ children }) => <code className='px-1.5 py-0.5 rounded bg-white/8 text-[13px] font-mono text-slate-100'>{children}</code>,
   table: ({ children }) => (
-    <div className='my-3 overflow-x-auto rounded-xl border border-white/[0.08]'>
+    <div className='my-3 overflow-x-auto rounded-xl border border-line'>
       <table className='w-full text-left text-[13px] border-collapse'>{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className='bg-white/[0.04] text-slate-100'>{children}</thead>,
-  th: ({ children }) => <th className='px-3 py-2 font-semibold border-b border-white/[0.08]'>{children}</th>,
-  td: ({ children }) => <td className='px-3 py-2 border-t border-white/[0.06] align-top'>{children}</td>,
+  thead: ({ children }) => <thead className='bg-white/4 text-slate-100'>{children}</thead>,
+  th: ({ children }) => <th className='px-3 py-2 font-semibold border-b border-line'>{children}</th>,
+  td: ({ children }) => <td className='px-3 py-2 border-t border-line-soft align-top'>{children}</td>,
 }
 
 // Main chat panel: message list + input box.
@@ -199,18 +201,19 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
                           {part.content}
                         </ReactMarkdown>
                       ) : (
-                        <div key={j} className='my-2 rounded-xl border border-white/[0.08] bg-[#13151c] overflow-hidden'>
-                          <div className='flex items-center justify-between px-3 h-8 border-b border-white/[0.06]'>
+                        <div key={j} className='my-2 rounded-xl border border-line bg-panel overflow-hidden'>
+                          <div className='flex items-center justify-between px-3 h-8 border-b border-line-soft'>
                             <span className='text-[11px] font-mono text-slate-500'>{part.fileName || part.language || 'code'}</span>
-                            <button
+                            <Button
+                              variant='link'
+                              className='text-[11px]'
                               onClick={() => {
                                 const artifact = toArtifact(m.content ?? '', j)
                                 if (artifact) onOpenArtifact(artifact)
                               }}
-                              className='text-[11px] text-slate-400 hover:text-slate-100 transition-colors cursor-pointer'
                             >
                               Open
-                            </button>
+                            </Button>
                           </div>
                           <pre className='p-3 overflow-x-auto text-[13px] font-mono'><code>{part.content}</code></pre>
                         </div>
@@ -236,7 +239,7 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
 
       {/* Input box */}
       <div className='px-6 pb-6'>
-        <div className='max-w-3xl mx-auto flex flex-col gap-1 p-2 rounded-2xl bg-[#13151c] border border-white/[0.08] focus-within:border-white/[0.16] transition-colors'>
+        <div className='max-w-3xl mx-auto flex flex-col gap-1 p-2 rounded-2xl bg-panel border border-line focus-within:border-white/16 transition-colors'>
           {/* Agent picker */}
           <div className='flex flex-wrap gap-1.5 px-1 pt-1'>
             {AGENTS.map((a) => (
@@ -244,15 +247,16 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
                 key={a.id}
                 onClick={() => setAgent(a.id)}
                 title={a.ready ? undefined : 'This agent is not built yet'}
-                className={`h-7 px-3 flex items-center gap-1.5 rounded-full text-[12px] border transition-colors cursor-pointer ${
+                className={cn(
+                  'h-7 px-3 flex items-center gap-1.5 rounded-full text-[12px] border transition-colors cursor-pointer',
                   agent === a.id
                     ? 'bg-white text-slate-900 border-white'
-                    : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.05] hover:text-slate-200'
-                }`}
+                    : 'border-line text-slate-400 hover:bg-white/5 hover:text-slate-200',
+                )}
               >
                 {a.label}
                 {!a.ready && (
-                  <span className={`text-[10px] ${agent === a.id ? 'text-slate-500' : 'text-slate-600'}`}>Soon</span>
+                  <span className={cn('text-[10px]', agent === a.id ? 'text-slate-500' : 'text-slate-600')}>Soon</span>
                 )}
               </button>
             ))}
@@ -267,13 +271,9 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
               placeholder='Message Aryan’s Assistant...'
               className='flex-1 max-h-40 resize-none bg-transparent px-2 py-2 text-[14px] text-slate-100 placeholder:text-slate-600 outline-none'
             />
-            <button
-              onClick={send}
-              disabled={!input.trim() || loading}
-              className='h-9 px-4 rounded-xl bg-white text-[13px] font-medium text-slate-900 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer'
-            >
+            <Button onClick={send} disabled={!input.trim() || loading}>
               Send
-            </button>
+            </Button>
           </div>
         </div>
         <p className='mt-2 text-center text-[11px] text-slate-600'>AI can make mistakes. Check important info.</p>

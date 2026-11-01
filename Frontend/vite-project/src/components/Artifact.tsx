@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import ResizeHandle from './ResizeHandle'
 import { ARTIFACT } from './layout'
+import { Button, IconButton } from './ui/Button'
+import { cn } from './ui/cn'
 
 export type ArtifactFile = {
   language: string
@@ -74,9 +76,6 @@ const buildPreview = (files: ArtifactFile[]) => {
   return doc
 }
 
-const iconButton =
-  'w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-100 transition-colors cursor-pointer'
-
 // Right-hand panel. Shows the artifact (files + live preview) or, when
 // nothing has been generated yet, a "Nothing to preview" message.
 // Drag the left edge to resize; drag it almost shut to collapse to the strip.
@@ -85,17 +84,18 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
 
   // Close button, shown at the right of the header in both states
   const controls = (
-    <button onClick={onClose} title='Close' className={iconButton}>
+    <IconButton onClick={onClose} title='Close'>
       ✕
-    </button>
+    </IconButton>
   )
 
   return (
     <aside
       style={{ width }}
-      className={`relative shrink-0 h-full flex flex-col bg-[#13151c] border-l border-white/[0.08] ${
-        dragging && width < ARTIFACT.collapseAt ? 'opacity-50' : ''
-      }`}
+      className={cn(
+        'relative shrink-0 h-full flex flex-col bg-panel border-l border-line',
+        dragging && width < ARTIFACT.collapseAt && 'opacity-50',
+      )}
     >
       {/* Drag the left edge to resize; nearly shut collapses to the strip */}
       <ResizeHandle
@@ -119,17 +119,17 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
         <ArtifactView artifact={artifact} controls={controls} />
       ) : (
         <>
-          <header className='shrink-0 h-12 flex items-center justify-between px-3 border-b border-white/[0.06]'>
+          <header className='shrink-0 h-12 flex items-center justify-between px-3 border-b border-line-soft'>
             <span className='px-2 text-[13px] font-medium text-slate-300'>Artifacts</span>
             {controls}
           </header>
           {/* Empty state */}
           <div className='flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center'>
-            <div className='w-12 h-12 rounded-2xl border border-white/[0.08] bg-white/[0.03] flex items-center justify-center text-[20px] text-slate-500'>
+            <div className='w-12 h-12 rounded-2xl border border-line bg-white/3 flex items-center justify-center text-[20px] text-slate-500'>
               {'</>'}
             </div>
             <p className='text-[15px] font-medium text-slate-200'>Nothing to preview yet</p>
-            <p className='max-w-[280px] text-[13px] text-slate-500'>
+            <p className='max-w-70 text-[13px] text-slate-500'>
               Ask for code, a web page, a PDF or slides and it will show up here.
             </p>
           </div>
@@ -169,17 +169,18 @@ function ArtifactView({ artifact, controls }: { artifact: ArtifactData; controls
   const downloadAll = () => files.forEach((f, i) => download(f, i))
 
   const tabClass = (active: boolean) =>
-    `h-8 px-3 shrink-0 rounded-lg text-[12px] font-mono transition-colors cursor-pointer ${
-      active ? 'bg-white/[0.08] text-slate-100' : 'text-slate-500 hover:text-slate-200'
-    }`
+    cn(
+      'h-8 px-3 shrink-0 rounded-lg text-[12px] font-mono transition-colors cursor-pointer',
+      active ? 'bg-white/8 text-slate-100' : 'text-slate-500 hover:text-slate-200',
+    )
 
   return (
     <>
-      <header className='shrink-0 flex items-center justify-between gap-3 px-3 py-2 border-b border-white/[0.06]'>
+      <header className='shrink-0 flex items-center justify-between gap-3 px-3 py-2 border-b border-line-soft'>
         {/* Tabs: Preview + one per file */}
         <div className='flex items-center gap-1 min-w-0 overflow-x-auto'>
           {preview && (
-            <button onClick={() => setSelected(-1)} className={`${tabClass(selected === -1)} font-sans`}>
+            <button onClick={() => setSelected(-1)} className={cn(tabClass(selected === -1), 'font-sans')}>
               Preview
             </button>
           )}
@@ -193,21 +194,18 @@ function ArtifactView({ artifact, controls }: { artifact: ArtifactData; controls
         <div className='flex items-center gap-3 shrink-0'>
           {current && (
             <>
-              <button onClick={copy} className='text-[12px] text-slate-400 hover:text-slate-100 transition-colors cursor-pointer'>
+              <Button variant='link' onClick={copy}>
                 {copied ? 'Copied!' : 'Copy'}
-              </button>
-              <button
-                onClick={() => download(current, selected)}
-                className='text-[12px] text-slate-400 hover:text-slate-100 transition-colors cursor-pointer'
-              >
+              </Button>
+              <Button variant='link' onClick={() => download(current, selected)}>
                 Download
-              </button>
+              </Button>
             </>
           )}
           {files.length > 1 && (
-            <button onClick={downloadAll} className='text-[12px] text-slate-400 hover:text-slate-100 transition-colors cursor-pointer'>
+            <Button variant='link' onClick={downloadAll}>
               Download all
-            </button>
+            </Button>
           )}
           {controls}
         </div>

@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { cn } from './ui/cn'
 
 type Props = {
   // Which edge of the panel the handle sits on. "left" = the panel grows when
@@ -61,12 +62,13 @@ function ResizeHandle({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       title='Drag to resize'
-      className={`group absolute top-0 z-20 h-full w-2 cursor-col-resize ${side === 'left' ? '-left-1' : '-right-1'}`}
+      className={cn('group absolute top-0 z-20 h-full w-2 cursor-col-resize', side === 'left' ? '-left-1' : '-right-1')}
     >
       <div
-        className={`mx-auto h-full w-0.5 transition-colors ${
-          dragging ? 'bg-indigo-400' : 'bg-transparent group-hover:bg-indigo-400/60'
-        }`}
+        className={cn(
+          'mx-auto h-full w-0.5 transition-colors',
+          dragging ? 'bg-indigo-400' : 'bg-transparent group-hover:bg-indigo-400/60',
+        )}
       />
     </div>
   )
