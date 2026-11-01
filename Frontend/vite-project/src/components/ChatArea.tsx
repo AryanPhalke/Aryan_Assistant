@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import type { ArtifactData } from './Artifact'
 import { Button } from './ui/Button'
 import { cn } from './ui/cn'
+import streamChat from '../features/streamChat'
 
 type Message = {
   _id?: string
@@ -97,9 +98,14 @@ const markdownComponents: Components = {
 function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
+  // loading = a reply is in progress; waiting = no text has arrived yet
+  // (shows the typing dots)
   const [loading, setLoading] = useState(false)
+  const [waiting, setWaiting] = useState(false)
   const [agent, setAgent] = useState('auto')
   const bottomRef = useRef<HTMLDivElement>(null)
+  // Lets the Stop button (or switching chats) cancel the stream
+  const abortRef = useRef<AbortController | null>(null)
   // Set while we create a conversation mid-send, so the effect below doesn't
   // wipe the message we just added
   const skipNextLoad = useRef(false)
@@ -110,6 +116,8 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
       skipNextLoad.current = false
       return
     }
+    // Switched to another chat: stop any reply still streaming
+    abortRef.current?.abort()
     const load = async () => {
       // "New chat": start with an empty message list
       if (!conversationId) {
@@ -139,6 +147,23 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
     setInput('')
     setMessages((prev) => [...prev, { role: 'user', content: prompt }])
     setLoading(true)
+    setWaiting(true)
+
+    const abort = new AbortController()
+    abortRef.current = abort
+
+    // The reply so far. The first piece adds a new assistant message; later
+    // pieces replace that last message with the longer text.
+    let reply = ''
+    let started = false
+    const showReply = (content: string) => {
+      // Decide now (not inside the updater, which React may run later)
+      const isFirst = !started
+      started = true
+      const message: Message = { role: 'assistant', content }
+      setMessages((prev) => (isFirst ? [...prev, message] : [...prev.slice(0, -1), message]))
+      setWaiting(false)
+    }
 
     try {
       let id = conversationId
@@ -146,28 +171,40 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
         skipNextLoad.current = true
         id = await ensureConversation(prompt)
       }
-      // Only send `agent` when the user picked one; otherwise the router decides
-      const { data } = await api.post('/api/agent/chat', {
-        prompt,
-        conversationId: id,
-        ...(agent !== 'auto' && { agent }),
-      })
-      const reply: string = data.aiResponse ?? ''
-      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
 
-      // Coding replies open all their files in the artifact panel automatically
-      const artifact = data.agent === 'coding' ? toArtifact(reply) : null
-      if (artifact) onOpenArtifact(artifact)
+      // Only send `agent` when the user picked one; otherwise the router decides
+      await streamChat(
+        { prompt, conversationId: id, ...(agent !== 'auto' && { agent }) },
+        (event) => {
+          if (event.type === 'token') {
+            reply += event.content
+            showReply(reply)
+          } else if (event.type === 'error') {
+            showReply(event.message)
+          } else if (event.type === 'done') {
+            // Coding replies open all their files in the artifact panel
+            const artifact = event.agent === 'coding' ? toArtifact(event.aiResponse) : null
+            if (artifact) onOpenArtifact(artifact)
+          }
+        },
+        abort.signal,
+      )
     } catch (error) {
+      // Stopped by the user: keep whatever text already arrived
+      if (abort.signal.aborted) return
       console.error('[ChatArea] Agent request failed:', error)
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: 'Something went wrong. Please try again.' },
-      ])
+      showReply('Something went wrong. Please try again.')
     } finally {
-      setLoading(false)
+      // Only reset if this is still the current stream
+      if (abortRef.current === abort) {
+        abortRef.current = null
+        setLoading(false)
+        setWaiting(false)
+      }
     }
   }
+
+  const stop = () => abortRef.current?.abort()
 
   // Enter sends, Shift+Enter adds a new line
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -224,8 +261,8 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
               </div>
             ))}
 
-            {/* Typing indicator while the agent works */}
-            {loading && (
+            {/* Typing indicator until the first words of the reply arrive */}
+            {waiting && (
               <div className='flex gap-1.5 py-2'>
                 <span className='w-2 h-2 rounded-full bg-slate-500 animate-bounce' />
                 <span className='w-2 h-2 rounded-full bg-slate-500 animate-bounce [animation-delay:150ms]' />
@@ -271,9 +308,16 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
               placeholder='Message Aryan’s Assistant...'
               className='flex-1 max-h-40 resize-none bg-transparent px-2 py-2 text-[14px] text-slate-100 placeholder:text-slate-600 outline-none'
             />
-            <Button onClick={send} disabled={!input.trim() || loading}>
-              Send
-            </Button>
+            {/* While a reply is streaming, Send becomes Stop */}
+            {loading ? (
+              <Button variant='outline' onClick={stop} className='h-9 px-4'>
+                Stop
+              </Button>
+            ) : (
+              <Button onClick={send} disabled={!input.trim()}>
+                Send
+              </Button>
+            )}
           </div>
         </div>
         <p className='mt-2 text-center text-[11px] text-slate-600'>AI can make mistakes. Check important info.</p>
