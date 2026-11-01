@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 export type ArtifactFile = {
   language: string
@@ -14,9 +14,22 @@ export type ArtifactData = {
 }
 
 type Props = {
-  artifact: ArtifactData
+  // null = nothing generated yet in this chat
+  artifact: ArtifactData | null
+  // Panel width in px; changed by dragging the left edge
+  width: number
+  onResize: (width: number) => void
+  // Collapses the panel back to the strip on the right edge
   onClose: () => void
 }
+
+// Drag limits: below COLLAPSE_AT the panel snaps shut on release; MIN_CHAT
+// keeps room for the chat (sidebar is 260px)
+export const DEFAULT_ARTIFACT_WIDTH = 560
+const MIN_WIDTH = 320
+const COLLAPSE_AT = 240
+const SIDEBAR_WIDTH = 260
+const MIN_CHAT = 360
 
 // File extension for names when the reply had no file name
 const EXTENSIONS: Record<string, string> = {
@@ -65,14 +78,112 @@ const buildPreview = (files: ArtifactFile[]) => {
   return doc
 }
 
-// Right-hand panel for code from a reply. Shows every file as a tab, plus a
-// live Preview that combines HTML + CSS + JS. Coding replies open here
-// automatically; other code blocks open from the "Open" button.
-function Artifact({ artifact, onClose }: Props) {
+const iconButton =
+  'w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-100 transition-colors cursor-pointer'
+
+// Right-hand panel. Shows the artifact (files + live preview) or, when
+// nothing has been generated yet, a "Nothing to preview" message.
+// Drag the left edge to resize; drag it almost shut to collapse to the strip.
+function Artifact({ artifact, width, onResize, onClose }: Props) {
+  // Where the drag started: pointer x and panel width at that moment
+  const dragStart = useRef<{ x: number; width: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Stop the browser from selecting chat text while dragging, and keep
+    // receiving move events even when the pointer leaves the handle
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dragStart.current = { x: e.clientX, width }
+    setDragging(true)
+  }
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStart.current) return
+    // The handle is on the left edge, so moving left makes the panel wider
+    const next = dragStart.current.width + (dragStart.current.x - e.clientX)
+    const max = window.innerWidth - SIDEBAR_WIDTH - MIN_CHAT
+    // Allow going below MIN_WIDTH while dragging so the user can see it closing
+    onResize(Math.max(COLLAPSE_AT - 40, Math.min(next, max)))
+  }
+
+  const onPointerUp = () => {
+    if (!dragStart.current) return
+    dragStart.current = null
+    setDragging(false)
+    if (width < COLLAPSE_AT) {
+      // Dragged nearly shut: collapse, and reopen at the default size next time
+      onClose()
+      onResize(DEFAULT_ARTIFACT_WIDTH)
+    } else if (width < MIN_WIDTH) {
+      onResize(MIN_WIDTH)
+    }
+  }
+
+  // Close button, shown at the right of the header in both states
+  const controls = (
+    <button onClick={onClose} title='Close' className={iconButton}>
+      ✕
+    </button>
+  )
+
+  return (
+    <aside
+      style={{ width }}
+      className={`relative shrink-0 h-full flex flex-col bg-[#13151c] border-l border-white/[0.08] ${
+        dragging && width < COLLAPSE_AT ? 'opacity-50' : ''
+      }`}
+    >
+      {/* Drag handle on the left edge */}
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        title='Drag to resize'
+        className='group absolute -left-1 top-0 z-20 h-full w-2 cursor-col-resize'
+      >
+        <div
+          className={`mx-auto h-full w-0.5 transition-colors ${
+            dragging ? 'bg-indigo-400' : 'bg-transparent group-hover:bg-indigo-400/60'
+          }`}
+        />
+      </div>
+
+      {/* While dragging, cover the panel so the preview iframe doesn't swallow
+          pointer events, and stop text from being selected */}
+      {dragging && <div className='absolute inset-0 z-10 cursor-col-resize select-none' />}
+
+      {artifact ? (
+        <ArtifactView artifact={artifact} controls={controls} />
+      ) : (
+        <>
+          <header className='shrink-0 h-12 flex items-center justify-between px-3 border-b border-white/[0.06]'>
+            <span className='px-2 text-[13px] font-medium text-slate-300'>Artifacts</span>
+            {controls}
+          </header>
+          {/* Empty state */}
+          <div className='flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center'>
+            <div className='w-12 h-12 rounded-2xl border border-white/[0.08] bg-white/[0.03] flex items-center justify-center text-[20px] text-slate-500'>
+              {'</>'}
+            </div>
+            <p className='text-[15px] font-medium text-slate-200'>Nothing to preview yet</p>
+            <p className='max-w-[280px] text-[13px] text-slate-500'>
+              Ask for code, a web page, a PDF or slides and it will show up here.
+            </p>
+          </div>
+        </>
+      )}
+    </aside>
+  )
+}
+
+// Files + preview for one artifact. Separate component so its tab state
+// resets when Home remounts it (via `key`) for a new artifact.
+function ArtifactView({ artifact, controls }: { artifact: ArtifactData; controls: React.ReactNode }) {
   const { files } = artifact
   const preview = buildPreview(files)
-  // -1 = Preview tab. Home remounts this panel (via `key`) for each new
-  // artifact, so the selection starts fresh every time.
+  // -1 = Preview tab
   const [selected, setSelected] = useState(preview ? -1 : artifact.active)
   const [copied, setCopied] = useState(false)
 
@@ -102,7 +213,7 @@ function Artifact({ artifact, onClose }: Props) {
     }`
 
   return (
-    <aside className='w-[45%] max-w-[720px] shrink-0 h-full flex flex-col bg-[#13151c] border-l border-white/[0.08]'>
+    <>
       <header className='shrink-0 flex items-center justify-between gap-3 px-3 py-2 border-b border-white/[0.06]'>
         {/* Tabs: Preview + one per file */}
         <div className='flex items-center gap-1 min-w-0 overflow-x-auto'>
@@ -137,13 +248,7 @@ function Artifact({ artifact, onClose }: Props) {
               Download all
             </button>
           )}
-          <button
-            onClick={onClose}
-            title='Close'
-            className='w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06] hover:text-slate-100 transition-colors cursor-pointer'
-          >
-            ✕
-          </button>
+          {controls}
         </div>
       </header>
 
@@ -156,7 +261,7 @@ function Artifact({ artifact, onClose }: Props) {
         // our app (no access to cookies, storage or the parent page)
         <iframe title='Preview' sandbox='allow-scripts' srcDoc={preview ?? ''} className='flex-1 w-full bg-white' />
       )}
-    </aside>
+    </>
   )
 }
 

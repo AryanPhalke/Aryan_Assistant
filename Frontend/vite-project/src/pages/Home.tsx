@@ -7,7 +7,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import {setUserdata} from '../../redux/userSlice.js'
 import SideBar from '../components/SideBar.jsx'
 import ChatArea from '../components/ChatArea'
-import Artifact, { type ArtifactData } from '../components/Artifact'
+import Artifact, { type ArtifactData, DEFAULT_ARTIFACT_WIDTH } from '../components/Artifact'
 
 type Conversation = { _id: string; title: string }
 
@@ -23,7 +23,17 @@ function Home() {
 
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
+  // Artifact panel: the content (null = nothing generated yet), whether the
+  // panel is open, and its width (changed by dragging its left edge)
   const [artifact, setArtifact] = useState<ArtifactData | null>(null)
+  const [artifactOpen, setArtifactOpen] = useState(false)
+  const [artifactWidth, setArtifactWidth] = useState(DEFAULT_ARTIFACT_WIDTH)
+
+  // Called by ChatArea when a reply has code (or the user clicks "Open")
+  const openArtifact = (data: ArtifactData) => {
+    setArtifact(data)
+    setArtifactOpen(true)
+  }
 
   // Load the user's conversations once they are logged in
   useEffect(() => {
@@ -130,14 +140,30 @@ function Home() {
           <ChatArea
             conversationId={activeId}
             ensureConversation={ensureConversation}
-            onOpenArtifact={setArtifact}
+            onOpenArtifact={openArtifact}
           />
-          {artifact && (
+          {artifactOpen ? (
             <Artifact
-              key={`${artifact.active}:${artifact.files.map((f) => `${f.fileName}:${f.code.length}`).join('|')}`}
+              key={artifact ? `${artifact.active}:${artifact.files.map((f) => `${f.fileName}:${f.code.length}`).join('|')}` : 'empty'}
               artifact={artifact}
-              onClose={() => setArtifact(null)}
+              width={artifactWidth}
+              onResize={setArtifactWidth}
+              onClose={() => setArtifactOpen(false)}
             />
+          ) : (
+            // Collapsed: a slim strip on the right edge that opens the panel
+            <button
+              onClick={() => setArtifactOpen(true)}
+              title='Open artifacts'
+              className='w-10 shrink-0 h-full flex flex-col items-center justify-center gap-3 border-l border-white/[0.06] bg-[#0a0c10] text-slate-500 hover:text-slate-200 hover:bg-white/[0.03] transition-colors cursor-pointer'
+            >
+              <span className='text-[14px]'>‹</span>
+              <span className='text-[11px] font-medium tracking-wider uppercase [writing-mode:vertical-rl] rotate-180'>
+                Artifacts
+              </span>
+              {/* Dot = something is ready to view */}
+              {artifact && <span className='w-1.5 h-1.5 rounded-full bg-indigo-400' />}
+            </button>
           )}
         </>
       )}
