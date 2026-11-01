@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 // import cookieParser from "cookie-parser";
 import connectDb from "./config/db.js";
-// import authRouter from "./routes/auth.route.js";
+import router from "./routes/agent.routes.js";
 
 const port = process.env.PORT;
 const app = express();
@@ -14,9 +14,9 @@ app.get("/", (req, res) => {
   res.json({ message: "Hello from agent" });
 });
 
-// Mounted at "/" because the gateway already strips the "/api/auth" prefix:
-// /api/auth/login (browser) -> /login (here)
-// app.use("/", authRouter);
+// Mounted at "/" because the gateway already strips the "/api/agent" prefix:
+// /api/agent/run (browser) -> /run (here)
+app.use("/", router);
 
 app.listen(port, () => {
   console.log(`[agent] Agent running on port ${port}`);
