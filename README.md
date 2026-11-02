@@ -43,24 +43,9 @@ the web, write code with a live preview, or create PDFs, slide decks and images.
 
 ## Architecture
 
-```
-                 Browser (React, :5173)
-                          |
-                          v
-                   Gateway (:8000) ------- reads sessions -------> Redis (:6379)
-                          |                                          ^
-       +------------------+------------------+                       |
-       | /api/auth/*      | /api/chat/*      | /api/agent/*          |
-       v                  v                  v                       |
-  Auth (:8001)       Chat (:8002) <----- Agent (:8003)               |
-       |                  |     history,     |                       |
-       |                  |     replies      +--> LLMs, Tavily,      |
-       |                  |                  |    Pollinations       |
-       |                  v                  +--> S3                 |
-       +-----------> MongoDB                                         |
-       |                                                             |
-       +-------------------- writes sessions ------------------------+
-```
+![Colour key for the diagrams](docs/diagrams/legend.svg)
+
+![System map: the browser, gateway, services, data stores and external providers](docs/diagrams/system.svg)
 
 - **Gateway:** the only server the browser talks to. It handles CORS and cookies,
   checks the session on private routes, and forwards requests to the services
@@ -73,14 +58,9 @@ the web, write code with a live preview, or create PDFs, slide decks and images.
 
 ### How a message is handled
 
-```
-START -> router -> chat ------------> END
-              |--> coding ----------> END
-              |--> pdf -------------> END
-              |--> ppt -------------> END
-              |--> imageGen --------> END
-              +--> search --> chat -> END
-```
+![Agent graph: the router picks one of six agents, and search hands off to chat](docs/diagrams/graph.svg)
+
+![One message, from the browser through the gateway, agent service and chat service](docs/diagrams/message.svg)
 
 1. The frontend streams `POST /api/agent/chat/stream` through the gateway.
 2. The agent service loads the conversation's history from the chat service.
@@ -96,6 +76,54 @@ Generated files are stored in S3, and messages keep a permanent
 redirects to a temporary S3 link, so the bucket stays private and old chats keep
 working.
 
+![File access: session check, owner check, then a redirect to a pre-signed S3 link](docs/diagrams/files.svg)
+
+### How each agent works
+
+Dashed arrows are failure and fallback paths. Select an agent to see its flow.
+
+<details>
+<summary><strong>chat</strong>: answers questions and writes the reply after a search</summary>
+
+![Chat agent flow](docs/diagrams/chat.svg)
+
+</details>
+
+<details>
+<summary><strong>search</strong>: fetches web results and passes them to chat</summary>
+
+![Search agent flow](docs/diagrams/search.svg)
+
+</details>
+
+<details>
+<summary><strong>coding</strong>: writes code that opens in the artifact panel</summary>
+
+![Coding agent flow](docs/diagrams/coding.svg)
+
+</details>
+
+<details>
+<summary><strong>pdf</strong>: creates a PDF file and replies with a link</summary>
+
+![PDF agent flow](docs/diagrams/pdf.svg)
+
+</details>
+
+<details>
+<summary><strong>ppt</strong>: creates a PowerPoint deck and a PDF copy for preview</summary>
+
+![PowerPoint agent flow](docs/diagrams/ppt.svg)
+
+</details>
+
+<details>
+<summary><strong>imageGen</strong>: generates an image and saves it to S3</summary>
+
+![Image agent flow](docs/diagrams/imageGen.svg)
+
+</details>
+
 ### How login works
 
 1. **Continue with Google** opens the Firebase popup, which returns an ID token.
@@ -106,6 +134,8 @@ working.
    browser as an httpOnly cookie.
 5. On later requests, the gateway's `protect` middleware looks the cookie up in
    Redis before letting the request through.
+
+![Login flow, and how a page reload restores the user](docs/diagrams/login.svg)
 
 ## Project structure
 
@@ -124,6 +154,7 @@ aryanAI/
 │   │       ├── config/        # LLM models, S3, MongoDB
 │   │       └── utils/         # PDF and PPTX rendering, S3 upload
 │   └── shared/redis/          # Redis client used by the gateway and auth service
+├── docs/diagrams/             # Flowcharts shown in this README
 └── Frontend/vite-project/
     ├── src/
     │   ├── pages/             # Home: login and the main layout
