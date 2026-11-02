@@ -60,7 +60,7 @@ const AGENTS = [
   { id: 'chat', label: 'Chat', ready: true },
   { id: 'search', label: 'Search', ready: false },
   { id: 'coding', label: 'Coding', ready: true },
-  { id: 'pdf', label: 'PDF', ready: false },
+  { id: 'pdf', label: 'PDF', ready: true },
   { id: 'ppt', label: 'Slides', ready: false },
   { id: 'imageGen', label: 'Image', ready: true },
 ]
@@ -75,8 +75,14 @@ const markdownComponents: Components = {
   strong: ({ children }) => <strong className='font-semibold text-slate-100'>{children}</strong>,
   ul: ({ children }) => <ul className='list-disc pl-5 my-2 flex flex-col gap-1 marker:text-slate-500'>{children}</ul>,
   ol: ({ children }) => <ol className='list-decimal pl-5 my-2 flex flex-col gap-1 marker:text-slate-500'>{children}</ol>,
+  // Generated PDFs are saved as "/api/agent/files/..." paths on the gateway, like images
   a: ({ href, children }) => (
-    <a href={href} target='_blank' rel='noreferrer' className='text-indigo-400 underline underline-offset-2 hover:text-indigo-300'>
+    <a
+      href={href?.startsWith('/api/') ? import.meta.env.VITE_SERVER_URL + href : href}
+      target='_blank'
+      rel='noreferrer'
+      className='text-indigo-400 underline underline-offset-2 hover:text-indigo-300'
+    >
       {children}
     </a>
   ),
