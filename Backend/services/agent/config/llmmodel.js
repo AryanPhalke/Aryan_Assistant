@@ -42,9 +42,9 @@ export const codingLlm = new ChatOpenAI({
   },
 });
 
-// PDF writer: same Groq model as chat, but more focused and with room for
-// long documents.
-export const pdfLlm = new ChatGroq({
+// PDF and PPT writer: same Groq model as chat, but more focused and with room
+// for long documents.
+export const documentLlm = new ChatGroq({
   apiKey: process.env.GROQ_API_KEY,
   model: "openai/gpt-oss-120b",
   temperature: 0.4,
@@ -64,7 +64,8 @@ export const getModel = (agent) => {
     case "coding":
       return codingLlm;
     case "pdf":
-      return pdfLlm;
+    case "ppt":
+      return documentLlm;
     default:
       return llm;
   }

@@ -1,6 +1,7 @@
 import { getModel } from "../config/llmmodel.js";
 import uploadToS3 from "../utils/uploadtoS3.js";
 import renderPdf from "../utils/renderPdf.js";
+import { cleanMarkdown, buildFileName } from "../utils/document.js";
 import { filePath } from "../controllers/file.controller.js";
 
 const PDF_WRITER = `You write documents that are converted into PDF files.
@@ -20,24 +21,6 @@ Accuracy:
 - Never make up facts, numbers, links or sources.
 - For personal details you weren't given (names, dates, contact details), use a
   placeholder like [Your Name].`;
-
-// Models sometimes add reasoning or wrap the document in a code fence, which
-// would otherwise be printed in the PDF
-const cleanMarkdown = (text) => {
-  const trimmed = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-  return trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i)?.[1] ?? trimmed;
-};
-
-// "# Notes on Photosynthesis" -> "notes-on-photosynthesis.pdf"
-const buildFileName = (markdown) => {
-  const title = markdown.match(/^#\s+(.+)$/m)?.[1] ?? "";
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-  return `${slug || "document"}.pdf`;
-};
 
 export const pdfAgent = async (state) => {
   try {
@@ -60,7 +43,7 @@ export const pdfAgent = async (state) => {
     const markdown = cleanMarkdown(String(res.content));
     if (!markdown) throw new Error("The LLM returned an empty document");
 
-    const fileName = buildFileName(markdown);
+    const fileName = buildFileName(markdown, "pdf");
     const { key } = await uploadToS3({
       userId: state.userId,
       fileName,

@@ -61,7 +61,7 @@ const AGENTS = [
   { id: 'search', label: 'Search', ready: false },
   { id: 'coding', label: 'Coding', ready: true },
   { id: 'pdf', label: 'PDF', ready: true },
-  { id: 'ppt', label: 'Slides', ready: false },
+  { id: 'ppt', label: 'Slides', ready: true },
   { id: 'imageGen', label: 'Image', ready: true },
 ]
 
