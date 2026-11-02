@@ -1,6 +1,7 @@
 import { getModel } from "../config/llmmodel.js";
 import uploadToS3 from "../utils/uploadtoS3.js";
 import renderPptx from "../utils/renderPptx.js";
+import renderSlidesPdf from "../utils/renderSlidesPdf.js";
 import { cleanMarkdown, buildFileName } from "../utils/document.js";
 import { filePath } from "../controllers/file.controller.js";
 
@@ -25,6 +26,23 @@ Accuracy:
 - Never make up facts, numbers, links or sources.
 - For personal details you weren't given (names, dates, contact details), use a
   placeholder like [Your Name].`;
+
+// Saves a PDF copy of the slides for the artifact panel and returns its path.
+// The .pptx is what the user asked for, so a failed preview doesn't fail the reply.
+const uploadPreview = async (userId, fileName, markdown) => {
+  try {
+    const { key } = await uploadToS3({
+      userId,
+      fileName: fileName.replace(/\.pptx$/, ".pdf"),
+      body: await renderSlidesPdf(markdown),
+      folder: "ppt",
+    });
+    return filePath(key);
+  } catch (error) {
+    console.error("[agent:ppt] Preview failed:", error.message);
+    return null;
+  }
+};
 
 export const pptAgent = async (state) => {
   try {
@@ -53,9 +71,12 @@ export const pptAgent = async (state) => {
       fileName,
       body: await renderPptx(markdown),
     });
+    const preview = await uploadPreview(state.userId, fileName, markdown);
 
-    // Markdown link, so it's saved and rendered like any other reply
-    return { aiResponse: `Your presentation is ready: [${fileName}](${filePath(key)})` };
+    // Markdown link, so it's saved and rendered like any other reply. Its title
+    // holds the preview's path for the artifact panel; the chat doesn't show it.
+    const title = preview ? ` "preview:${preview}"` : "";
+    return { aiResponse: `Your presentation is ready: [${fileName}](${filePath(key)}${title})` };
   } catch (error) {
     console.error("[agent:ppt] Failed:", error.message);
     return { aiResponse: "Sorry, I couldn't create that presentation right now. Please try again." };

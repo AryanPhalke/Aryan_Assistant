@@ -3,7 +3,7 @@ import puppeteer from "puppeteer";
 
 const RENDER_TIMEOUT_MS = 30_000;
 
-const escapeHtml = (text) =>
+export const escapeHtml = (text) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // The Markdown comes from an LLM, so it's untrusted: show raw HTML as plain
@@ -51,10 +51,8 @@ const getBrowser = () => {
   return browser;
 };
 
-// Turns Markdown into a PDF and returns it as a Buffer
-const renderPdf = async (markdown) => {
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>${marked.parse(markdown)}</body></html>`;
-
+// Prints a complete HTML document to a PDF and returns it as a Buffer
+export const printHtml = async (html, options) => {
   const page = await (await getBrowser()).newPage();
   try {
     // The page has everything it needs inline: no scripts, no network
@@ -63,16 +61,21 @@ const renderPdf = async (markdown) => {
     page.on("request", (request) => request.abort());
 
     await page.setContent(html, { timeout: RENDER_TIMEOUT_MS });
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "18mm", right: "16mm", bottom: "18mm", left: "16mm" },
-      timeout: RENDER_TIMEOUT_MS,
-    });
+    const pdf = await page.pdf({ printBackground: true, timeout: RENDER_TIMEOUT_MS, ...options });
     return Buffer.from(pdf);
   } finally {
     await page.close();
   }
+};
+
+// Turns Markdown into a PDF and returns it as a Buffer
+const renderPdf = (markdown) => {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${STYLES}</style></head><body>${marked.parse(markdown)}</body></html>`;
+
+  return printHtml(html, {
+    format: "A4",
+    margin: { top: "18mm", right: "16mm", bottom: "18mm", left: "16mm" },
+  });
 };
 
 export default renderPdf;

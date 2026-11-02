@@ -1,5 +1,5 @@
-import { marked } from "marked";
 import PptxGenJS from "pptxgenjs";
+import parseDeck, { countLines } from "./parseDeck.js";
 
 const FONT = "Calibri";
 const CODE_FONT = "Consolas";
@@ -13,119 +13,7 @@ const MARGIN_X = 0.6;
 const WIDTH = 12.13;
 const BODY_Y = 1.5;
 const BODY_H = 5.3;
-
-// PowerPoint doesn't overflow text onto a new slide by itself, so long slides
-// are split into "(cont.)" slides before they're drawn. These limits fit the
-// body area at font size 24.
-const MAX_LINES = 8;
-const CHARS_PER_LINE = 70;
-const MAX_TABLE_ROWS = 7;
-// Text this short stays on the same slide as the table after it
-const MAX_INTRO_LINES = 2;
 const INTRO_LINE_H = 0.5;
-
-// Plain text of inline Markdown: "**bold** [link](url)" -> "bold link"
-const inlineText = (tokens = []) =>
-  tokens
-    .map((token) => {
-      if (token.type === "br" || (token.type === "html" && /^<br/i.test(token.text))) return " ";
-      return token.tokens ? inlineText(token.tokens) : (token.text ?? "");
-    })
-    .join("");
-
-// Flattens a list, keeping how deep each bullet is nested
-const listBlocks = (list, level = 0) =>
-  list.items.flatMap((item) => {
-    const text = item.tokens.filter((t) => t.type !== "list").flatMap((t) => t.tokens ?? []);
-    const nested = item.tokens.filter((t) => t.type === "list");
-    return [
-      { text: inlineText(text), bullet: true, level },
-      ...nested.flatMap((list) => listBlocks(list, level + 1)),
-    ];
-  });
-
-// Turns the Markdown into { title, subtitle, slides: [{ title, blocks }] }.
-// A block is a bullet, a line of text, a line of code or a table.
-const parseDeck = (markdown) => {
-  const deck = { title: "", subtitle: "", slides: [] };
-  let slide;
-
-  for (const token of marked.lexer(markdown)) {
-    if (token.type === "space" || token.type === "hr") continue;
-
-    if (token.type === "heading" && token.depth === 1 && !deck.title) {
-      deck.title = inlineText(token.tokens);
-      continue;
-    }
-    if (token.type === "heading" && token.depth <= 2) {
-      slide = { title: inlineText(token.tokens), blocks: [] };
-      deck.slides.push(slide);
-      continue;
-    }
-    if (!slide && token.type === "paragraph" && !deck.subtitle) {
-      deck.subtitle = inlineText(token.tokens);
-      continue;
-    }
-    if (!slide) {
-      slide = { title: deck.title, blocks: [] };
-      deck.slides.push(slide);
-    }
-
-    if (token.type === "list") {
-      slide.blocks.push(...listBlocks(token));
-    } else if (token.type === "table") {
-      slide.blocks.push({
-        header: token.header.map((cell) => inlineText(cell.tokens)),
-        rows: token.rows.map((row) => row.map((cell) => inlineText(cell.tokens))),
-      });
-    } else if (token.type === "code") {
-      slide.blocks.push(...token.text.split("\n").map((line) => ({ text: line, code: true })));
-    } else {
-      slide.blocks.push({ text: token.tokens ? inlineText(token.tokens) : (token.text ?? "") });
-    }
-  }
-  return deck;
-};
-
-const countLines = (block) => Math.max(1, Math.ceil(block.text.length / CHARS_PER_LINE));
-
-// Splits one slide's blocks into pages that fit on a slide
-const paginate = (blocks) => {
-  const pages = [];
-  let items = [];
-  let lines = 0;
-  const flush = () => {
-    if (items.length) pages.push({ items });
-    items = [];
-    lines = 0;
-  };
-
-  for (const block of blocks) {
-    if (block.rows) {
-      let intro = [];
-      if (lines <= MAX_INTRO_LINES) {
-        intro = items;
-        items = [];
-      }
-      flush();
-      for (let i = 0; i < block.rows.length; i += MAX_TABLE_ROWS) {
-        pages.push({
-          items: i === 0 ? intro : [],
-          header: block.header,
-          rows: block.rows.slice(i, i + MAX_TABLE_ROWS),
-        });
-      }
-      lines = 0;
-      continue;
-    }
-    if (lines + countLines(block) > MAX_LINES) flush();
-    items.push(block);
-    lines += countLines(block);
-  }
-  flush();
-  // A slide with only a title (e.g. "Thank You") is still a slide
-  return pages.length ? pages : [{ items: [] }];
-};
 
 const addTitleSlide = (pptx, deck) => {
   const slide = pptx.addSlide();
@@ -199,9 +87,9 @@ const addItems = (slide, items, h) => {
   );
 };
 
-const addContentSlide = (pptx, title, page) => {
+const addContentSlide = (pptx, page) => {
   const slide = pptx.addSlide();
-  slide.addText(title, {
+  slide.addText(page.title, {
     x: MARGIN_X,
     y: 0.35,
     w: WIDTH,
@@ -232,22 +120,16 @@ const addContentSlide = (pptx, title, page) => {
   }
 };
 
-// Turns Markdown into a PowerPoint file and returns it as a Buffer:
-// "# " is the title slide, each "## " starts a new slide
+// Turns Markdown into a PowerPoint file and returns it as a Buffer
 const renderPptx = async (markdown) => {
   const deck = parseDeck(markdown);
-  if (!deck.slides.length) throw new Error("The deck has no slides");
 
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE";
   pptx.title = deck.title;
 
   addTitleSlide(pptx, deck);
-  for (const slide of deck.slides) {
-    paginate(slide.blocks).forEach((page, i) => {
-      addContentSlide(pptx, i === 0 ? slide.title : `${slide.title} (cont.)`, page);
-    });
-  }
+  deck.pages.forEach((page) => addContentSlide(pptx, page));
 
   return pptx.write({ outputType: "nodebuffer" });
 };

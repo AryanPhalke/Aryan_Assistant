@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import api from '../../utils/axios'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { ArtifactData } from './Artifact'
+import type { ArtifactData, ArtifactDocument } from './Artifact'
 import { Button } from './ui/Button'
 import { cn } from './ui/cn'
 import streamChat from '../features/streamChat'
@@ -52,6 +52,53 @@ const toArtifact = (text: string, partIndex?: number): ArtifactData | null => {
   return { files, active }
 }
 
+const FILE_PATH = '/api/agent/files/'
+
+// Reads a link to a generated PDF or PowerPoint; null for any other link. The
+// PPT agent puts the path of a deck's PDF copy in the link's title.
+const toDocument = (href?: string, title?: string): ArtifactDocument | null => {
+  if (!href?.startsWith(FILE_PATH) || !/\.(pdf|pptx)$/i.test(href)) return null
+  const preview = title?.startsWith(`preview:${FILE_PATH}`) ? title.slice('preview:'.length) : undefined
+  return {
+    // "1730000000000-notes.pdf" -> "notes.pdf"
+    fileName: href.split('/').pop()!.replace(/^\d+-/, ''),
+    path: href,
+    previewPath: /\.pdf$/i.test(href) ? href : preview,
+  }
+}
+
+// Finds the file link in a reply from the pdf or ppt agent
+const documentInReply = (text: string): ArtifactData | null => {
+  const link = text.match(/\]\((\/api\/agent\/files\/[^\s)]+)(?: "([^"]+)")?\)/)
+  const document = link && toDocument(link[1], link[2])
+  return document ? { document } : null
+}
+
+// Lets links inside Markdown replies open the artifact panel
+const OpenArtifactContext = createContext<Props['onOpenArtifact'] | null>(null)
+
+// Generated PDFs and decks open in the artifact panel (Ctrl/Cmd+click still
+// opens a new tab); every other link opens in a new tab
+function MarkdownLink({ href, title, children }: React.ComponentProps<'a'>) {
+  const onOpenArtifact = useContext(OpenArtifactContext)
+  const document = toDocument(href, title)
+  return (
+    <a
+      href={href?.startsWith('/api/') ? import.meta.env.VITE_SERVER_URL + href : href}
+      target='_blank'
+      rel='noreferrer'
+      onClick={(e) => {
+        if (!document || !onOpenArtifact || e.ctrlKey || e.metaKey) return
+        e.preventDefault()
+        onOpenArtifact({ document })
+      }}
+      className='text-indigo-400 underline underline-offset-2 hover:text-indigo-300'
+    >
+      {children}
+    </a>
+  )
+}
+
 // Agents the user can pick. `id` must match the node names in the agent
 // service's graph.js; "auto" lets the router decide. `ready: false` marks
 // agents that aren't built yet (they reply with a "not available" message).
@@ -75,16 +122,10 @@ const markdownComponents: Components = {
   strong: ({ children }) => <strong className='font-semibold text-slate-100'>{children}</strong>,
   ul: ({ children }) => <ul className='list-disc pl-5 my-2 flex flex-col gap-1 marker:text-slate-500'>{children}</ul>,
   ol: ({ children }) => <ol className='list-decimal pl-5 my-2 flex flex-col gap-1 marker:text-slate-500'>{children}</ol>,
-  // Generated PDFs are saved as "/api/agent/files/..." paths on the gateway, like images
-  a: ({ href, children }) => (
-    <a
-      href={href?.startsWith('/api/') ? import.meta.env.VITE_SERVER_URL + href : href}
-      target='_blank'
-      rel='noreferrer'
-      className='text-indigo-400 underline underline-offset-2 hover:text-indigo-300'
-    >
+  a: ({ href, title, children }) => (
+    <MarkdownLink href={href} title={title}>
       {children}
-    </a>
+    </MarkdownLink>
   ),
   blockquote: ({ children }) => <blockquote className='border-l-2 border-white/15 pl-3 my-2 text-slate-400'>{children}</blockquote>,
   hr: () => <hr className='my-4 border-line' />,
@@ -203,8 +244,11 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
           } else if (event.type === 'error') {
             showReply(event.message)
           } else if (event.type === 'done') {
-            // Coding replies open all their files in the artifact panel
-            const artifact = event.agent === 'coding' ? toArtifact(event.aiResponse) : null
+            // Coding replies open all their files in the artifact panel, and
+            // pdf and ppt replies open the file they made
+            let artifact = null
+            if (event.agent === 'coding') artifact = toArtifact(event.aiResponse)
+            if (event.agent === 'pdf' || event.agent === 'ppt') artifact = documentInReply(event.aiResponse)
             if (artifact) onOpenArtifact(artifact)
           }
         },
@@ -255,9 +299,11 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
                   <div className='w-full text-[14px] leading-relaxed text-slate-300 flex flex-col gap-1'>
                     {splitCodeBlocks(m.content ?? '').map((part, j) =>
                       part.type === 'text' ? (
-                        <ReactMarkdown key={j} remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                          {part.content}
-                        </ReactMarkdown>
+                        <OpenArtifactContext.Provider key={j} value={onOpenArtifact}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                            {part.content}
+                          </ReactMarkdown>
+                        </OpenArtifactContext.Provider>
                       ) : (
                         <div key={j} className='my-2 rounded-xl border border-line bg-panel overflow-hidden'>
                           <div className='flex items-center justify-between px-3 h-8 border-b border-line-soft'>

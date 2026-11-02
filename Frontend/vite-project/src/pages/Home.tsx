@@ -214,7 +214,13 @@ function Home() {
           />
           {artifactOpen ? (
             <Artifact
-              key={artifact ? `${artifact.active}:${artifact.files.map((f) => `${f.fileName}:${f.code.length}`).join('|')}` : 'empty'}
+              key={
+                !artifact
+                  ? 'empty'
+                  : 'document' in artifact
+                    ? artifact.document.path
+                    : `${artifact.active}:${artifact.files.map((f) => `${f.fileName}:${f.code.length}`).join('|')}`
+              }
               artifact={artifact}
               width={artifactWidth}
               maxWidth={artifactMax}

@@ -12,10 +12,21 @@ export type ArtifactFile = {
 }
 
 // All code blocks from one reply, plus which one to show first
-export type ArtifactData = {
+export type ArtifactFiles = {
   files: ArtifactFile[]
   active: number
 }
+
+// A generated PDF or PowerPoint, as "/api/agent/files/..." paths on the gateway
+export type ArtifactDocument = {
+  fileName: string
+  path: string
+  // PDF to display. Browsers can't display .pptx files, so decks have a PDF copy
+  // (decks from older chats don't, and can only be downloaded)
+  previewPath?: string
+}
+
+export type ArtifactData = ArtifactFiles | { document: ArtifactDocument }
 
 type Props = {
   // null = nothing generated yet in this chat
@@ -115,7 +126,9 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
           pointer events, and stop text from being selected */}
       {dragging && <div className='absolute inset-0 z-10 cursor-col-resize select-none' />}
 
-      {artifact ? (
+      {artifact && 'document' in artifact ? (
+        <DocumentView document={artifact.document} controls={controls} />
+      ) : artifact ? (
         <ArtifactView artifact={artifact} controls={controls} />
       ) : (
         <>
@@ -139,9 +152,46 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
   )
 }
 
+// A generated PDF or PowerPoint, displayed by the browser's PDF viewer
+function DocumentView({ document, controls }: { document: ArtifactDocument; controls: React.ReactNode }) {
+  const server = import.meta.env.VITE_SERVER_URL
+  const previewUrl = document.previewPath && server + document.previewPath
+  const linkClass = 'text-[12px] text-slate-400 hover:text-slate-100 transition-colors'
+
+  return (
+    <>
+      <header className='shrink-0 h-12 flex items-center justify-between gap-3 px-3 border-b border-line-soft'>
+        <span className='px-2 min-w-0 truncate text-[12px] font-mono text-slate-100'>{document.fileName}</span>
+        <div className='flex items-center gap-3 shrink-0'>
+          {/* Many phone browsers can't show PDFs in a frame, so keep a way out */}
+          {previewUrl && (
+            <a href={previewUrl} target='_blank' rel='noreferrer' className={linkClass}>
+              Open
+            </a>
+          )}
+          <a href={`${server}${document.path}?download=1`} className={linkClass}>
+            Download
+          </a>
+          {controls}
+        </div>
+      </header>
+
+      {previewUrl ? (
+        // No sandbox here: Chrome won't show PDFs in a sandboxed frame. The file
+        // only comes from our own bucket, and PDFs are shown by the browser's viewer.
+        <iframe title={document.fileName} src={previewUrl} className='flex-1 w-full bg-white' />
+      ) : (
+        <div className='flex-1 flex items-center justify-center px-8 text-center text-[13px] text-slate-500'>
+          No preview for this file. Use Download to open it.
+        </div>
+      )}
+    </>
+  )
+}
+
 // Files + preview for one artifact. Separate component so its tab state
 // resets when Home remounts it (via `key`) for a new artifact.
-function ArtifactView({ artifact, controls }: { artifact: ArtifactData; controls: React.ReactNode }) {
+function ArtifactView({ artifact, controls }: { artifact: ArtifactFiles; controls: React.ReactNode }) {
   const { files } = artifact
   const preview = buildPreview(files)
   // -1 = Preview tab

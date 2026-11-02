@@ -56,11 +56,20 @@ export const uploadFile = async (key, body, contentType) => {
 
 // Returns a temporary link to a private file, so the browser can show or
 // download it without the bucket being public. Create a fresh link each
-// time the file is shown, since links expire.
-export const getFileUrl = (key, expiresIn = URL_EXPIRES_IN) =>
-  getSignedUrl(getClient(), new GetObjectCommand({ Bucket: BUCKET, Key: key }), {
-    expiresIn,
-  });
+// time the file is shown, since links expire. With downloadAs (a file name) the
+// browser saves the file instead of displaying it.
+export const getFileUrl = (key, expiresIn = URL_EXPIRES_IN, downloadAs) =>
+  getSignedUrl(
+    getClient(),
+    new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      ...(downloadAs && {
+        ResponseContentDisposition: `attachment; filename="${downloadAs}"`,
+      }),
+    }),
+    { expiresIn },
+  );
 
 // Deletes a file (e.g. when its conversation is deleted)
 export const deleteFile = (key) =>
