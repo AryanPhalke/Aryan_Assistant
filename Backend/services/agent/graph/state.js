@@ -6,6 +6,8 @@ export const agentState = Annotation.Root({
   history: Annotation(),
   // Logged-in user's name (from their Google account)
   userName: Annotation(),
+  // Logged-in user's id (from the gateway); files are saved under it in S3
+  userId: Annotation(),
   aiResponse: Annotation(),
   agent: Annotation(),
   converstaionId: Annotation(),

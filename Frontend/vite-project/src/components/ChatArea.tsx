@@ -62,7 +62,7 @@ const AGENTS = [
   { id: 'coding', label: 'Coding', ready: true },
   { id: 'pdf', label: 'PDF', ready: false },
   { id: 'ppt', label: 'Slides', ready: false },
-  { id: 'imageGen', label: 'Image', ready: false },
+  { id: 'imageGen', label: 'Image', ready: true },
 ]
 
 // Tailwind styles for each Markdown element in AI replies
@@ -82,6 +82,21 @@ const markdownComponents: Components = {
   ),
   blockquote: ({ children }) => <blockquote className='border-l-2 border-white/15 pl-3 my-2 text-slate-400'>{children}</blockquote>,
   hr: () => <hr className='my-4 border-line' />,
+  // Generated images (imageGen agent); click opens the full size in a new tab.
+  // Images in S3 are saved as "/api/agent/files/..." paths on the gateway.
+  img: ({ src, alt }) => {
+    const url = typeof src === 'string' && src.startsWith('/api/') ? import.meta.env.VITE_SERVER_URL + src : src
+    return (
+      <a href={url} target='_blank' rel='noreferrer' className='block my-2 w-fit'>
+        <img
+          src={url}
+          alt={alt}
+          loading='lazy'
+          className='max-w-full sm:max-w-md rounded-xl border border-line bg-white/4 aspect-square object-cover'
+        />
+      </a>
+    )
+  },
   // Inline `code`
   code: ({ children }) => <code className='px-1.5 py-0.5 rounded bg-white/8 text-[13px] font-mono text-slate-100'>{children}</code>,
   table: ({ children }) => (

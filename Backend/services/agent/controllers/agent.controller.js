@@ -24,6 +24,10 @@ const getHistory = async (conversationId) => {
   }
 };
 
+// Nodes whose LLM calls are internal steps, not the reply itself: the
+// router's agent name and imageGen's rewritten image prompt
+const SILENT_NODES = ["router", "imageGen"];
+
 // Saves one message in the chat service (route is /save-messages)
 const saveMessage = (conversationId, role, content) =>
   axios.post(`${process.env.CHAT_SERVICE}/save-messages`, {
@@ -61,16 +65,18 @@ export const streamAgent = async (req, res) => {
     const history = await getHistory(conversationId);
     await saveMessage(conversationId, "user", prompt);
     const userName = decodeURIComponent(req.headers["x-user-name"] ?? "");
+    const userId = req.headers["x-user-id"];
 
     // "messages" mode yields each LLM token as it's generated; "values" mode
     // yields the full state after each step (we keep the last one)
     const stream = await graph.stream(
-      { prompt, history, userName, agent },
+      { prompt, history, userName, userId, agent },
       { streamMode: ["messages", "values"], signal: abort.signal },
     );
 
     let finalState = {};
     let announced = false;
+    let streamed = false;
     for await (const [mode, chunk] of stream) {
       if (mode === "values") {
         finalState = chunk;
@@ -82,10 +88,10 @@ export const streamAgent = async (req, res) => {
         continue;
       }
       const [message, metadata] = chunk;
-      // Skip the router's own output (it's just the agent name)
-      if (metadata.langgraph_node === "router") continue;
+      if (SILENT_NODES.includes(metadata.langgraph_node)) continue;
       if (typeof message.content === "string" && message.content) {
         send({ type: "token", content: message.content });
+        streamed = true;
       }
     }
 
@@ -93,8 +99,9 @@ export const streamAgent = async (req, res) => {
     // Agents that aren't built yet return nothing (see runAgent)
     if (!aiResponse) {
       aiResponse = `The ${finalState.agent} agent isn't available yet. Please try a general question.`;
-      send({ type: "token", content: aiResponse });
     }
+    // Replies not written token by token (e.g. imageGen's image) are sent in one piece
+    if (!streamed) send({ type: "token", content: aiResponse });
 
     await saveMessage(conversationId, "assistant", aiResponse);
     send({ type: "done", agent: finalState.agent, aiResponse });
@@ -129,12 +136,13 @@ export const runAgent = async (req, res) => {
       role: "user",
     });
 
-    // Logged-in user's name, added by the gateway, so every conversation knows it
+    // Logged-in user's name and id, added by the gateway
     const userName = decodeURIComponent(req.headers["x-user-name"] ?? "");
+    const userId = req.headers["x-user-id"];
 
-    const result = await graph.invoke({ prompt, history, userName, agent });
+    const result = await graph.invoke({ prompt, history, userName, userId, agent });
 
-    // Agents that aren't built yet (coding, pdf, ppt, imageGen, search) return
+    // Agents that aren't built yet (pdf, ppt, search) return
     // nothing, so fall back to a message instead of saving an empty reply
     if (!result.aiResponse) {
       result.aiResponse = `The ${result.agent} agent isn't available yet. Please try a general question.`;
