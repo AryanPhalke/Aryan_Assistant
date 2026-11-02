@@ -65,6 +65,7 @@ export const codingAgent = async (state) => {
       ...history,
       ["human", state.prompt],
     ]);
+    console.log("[agent:coding] LLM response:", response.content);
 
     return { aiResponse: response.content };
   } catch (error) {

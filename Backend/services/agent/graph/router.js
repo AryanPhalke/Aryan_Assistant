@@ -60,6 +60,7 @@ export const router = async (state) => {
       ["system", ROUTER_PROMPT],
       ["human", state.prompt],
     ]);
+    console.log("[agent:router] LLM response:", res.content);
 
     // Clean reply like " Coding." -> "coding" and match it to a real agent name
     const reply = String(res.content).trim().replace(/[^a-zA-Z]/g, "");

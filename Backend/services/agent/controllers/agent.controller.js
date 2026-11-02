@@ -25,9 +25,9 @@ const getHistory = async (conversationId) => {
 };
 
 // Nodes whose LLM calls are internal steps, not the reply itself: the
-// router's agent name, imageGen's rewritten image prompt and the Markdown that
-// pdf and ppt turn into files
-const SILENT_NODES = ["router", "imageGen", "pdf", "ppt"];
+// router's agent name, search's rewritten query, imageGen's rewritten image
+// prompt and the Markdown that pdf and ppt turn into files
+const SILENT_NODES = ["router", "search", "imageGen", "pdf", "ppt"];
 
 // Saves one message in the chat service (route is /save-messages)
 const saveMessage = (conversationId, role, content) =>
@@ -143,8 +143,8 @@ export const runAgent = async (req, res) => {
 
     const result = await graph.invoke({ prompt, history, userName, userId, agent });
 
-    // Agents that aren't built yet (search) return
-    // nothing, so fall back to a message instead of saving an empty reply
+    // Agents that aren't built yet return nothing, so fall back to a message
+    // instead of saving an empty reply
     if (!result.aiResponse) {
       result.aiResponse = `The ${result.agent} agent isn't available yet. Please try a general question.`;
     }

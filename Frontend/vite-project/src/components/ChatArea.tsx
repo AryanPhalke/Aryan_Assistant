@@ -105,7 +105,7 @@ function MarkdownLink({ href, title, children }: React.ComponentProps<'a'>) {
 const AGENTS = [
   { id: 'auto', label: 'Auto', ready: true },
   { id: 'chat', label: 'Chat', ready: true },
-  { id: 'search', label: 'Search', ready: false },
+  { id: 'search', label: 'Search', ready: true },
   { id: 'coding', label: 'Coding', ready: true },
   { id: 'pdf', label: 'PDF', ready: true },
   { id: 'ppt', label: 'Slides', ready: true },

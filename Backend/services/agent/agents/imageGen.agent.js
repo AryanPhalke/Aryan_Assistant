@@ -60,6 +60,7 @@ const writePrompt = async (state) => {
       ...history,
       ["human", state.prompt],
     ]);
+    console.log("[agent:imageGen] LLM response:", res.content);
     const text = String(res.content).trim().replace(/^["']|["']$/g, "");
     return text || state.prompt;
   } catch (error) {
