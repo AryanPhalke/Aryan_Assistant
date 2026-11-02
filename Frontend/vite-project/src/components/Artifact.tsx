@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ResizeHandle from './ResizeHandle'
 import { ARTIFACT } from './layout'
 import { Button, IconButton } from './ui/Button'
+import { CloseIcon, FilesIcon } from './ui/icons'
 import { cn } from './ui/cn'
 
 export type ArtifactFile = {
@@ -96,7 +97,7 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
   // Close button, shown at the right of the header in both states
   const controls = (
     <IconButton onClick={onClose} title='Close'>
-      ✕
+      <CloseIcon />
     </IconButton>
   )
 
@@ -133,16 +134,14 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
       ) : (
         <>
           <header className='shrink-0 h-12 flex items-center justify-between px-3 border-b border-line-soft'>
-            <span className='px-2 text-[13px] font-medium text-slate-300'>Artifacts</span>
+            <span className='px-2 text-[13px] font-medium text-ink'>Artifacts</span>
             {controls}
           </header>
           {/* Empty state */}
-          <div className='flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center'>
-            <div className='w-12 h-12 rounded-2xl border border-line bg-white/3 flex items-center justify-center text-[20px] text-slate-500'>
-              {'</>'}
-            </div>
-            <p className='text-[15px] font-medium text-slate-200'>Nothing to preview yet</p>
-            <p className='max-w-70 text-[13px] text-slate-500'>
+          <div className='flex-1 flex flex-col items-center justify-center gap-2 px-8 text-center'>
+            <FilesIcon size={22} className='mb-1 text-faint' />
+            <p className='text-[14px] font-medium text-ink'>Nothing to preview yet</p>
+            <p className='max-w-70 text-[13px] text-muted'>
               Ask for code, a web page, a PDF or slides and it will show up here.
             </p>
           </div>
@@ -156,12 +155,12 @@ function Artifact({ artifact, width, maxWidth, onResize, onClose }: Props) {
 function DocumentView({ document, controls }: { document: ArtifactDocument; controls: React.ReactNode }) {
   const server = import.meta.env.VITE_SERVER_URL
   const previewUrl = document.previewPath && server + document.previewPath
-  const linkClass = 'text-[12px] text-slate-400 hover:text-slate-100 transition-colors'
+  const linkClass = 'text-[12px] text-muted hover:text-ink transition-colors'
 
   return (
     <>
       <header className='shrink-0 h-12 flex items-center justify-between gap-3 px-3 border-b border-line-soft'>
-        <span className='px-2 min-w-0 truncate text-[12px] font-mono text-slate-100'>{document.fileName}</span>
+        <span className='px-2 min-w-0 truncate text-[12px] font-mono text-ink'>{document.fileName}</span>
         <div className='flex items-center gap-3 shrink-0'>
           {/* Many phone browsers can't show PDFs in a frame, so keep a way out */}
           {previewUrl && (
@@ -181,7 +180,7 @@ function DocumentView({ document, controls }: { document: ArtifactDocument; cont
         // only comes from our own bucket, and PDFs are shown by the browser's viewer.
         <iframe title={document.fileName} src={previewUrl} className='flex-1 w-full bg-white' />
       ) : (
-        <div className='flex-1 flex items-center justify-center px-8 text-center text-[13px] text-slate-500'>
+        <div className='flex-1 flex items-center justify-center px-8 text-center text-[13px] text-muted'>
           No preview for this file. Use Download to open it.
         </div>
       )}
@@ -220,13 +219,13 @@ function ArtifactView({ artifact, controls }: { artifact: ArtifactFiles; control
 
   const tabClass = (active: boolean) =>
     cn(
-      'h-8 px-3 shrink-0 rounded-lg text-[12px] font-mono transition-colors cursor-pointer',
-      active ? 'bg-white/8 text-slate-100' : 'text-slate-500 hover:text-slate-200',
+      'h-7 px-2.5 shrink-0 rounded-md text-[12px] font-mono transition-colors cursor-pointer',
+      active ? 'bg-raised text-ink' : 'text-muted hover:text-ink',
     )
 
   return (
     <>
-      <header className='shrink-0 flex items-center justify-between gap-3 px-3 py-2 border-b border-line-soft'>
+      <header className='shrink-0 h-12 flex items-center justify-between gap-3 px-3 border-b border-line-soft'>
         {/* Tabs: Preview + one per file */}
         <div className='flex items-center gap-1 min-w-0 overflow-x-auto'>
           {preview && (
@@ -262,7 +261,7 @@ function ArtifactView({ artifact, controls }: { artifact: ArtifactFiles; control
       </header>
 
       {current ? (
-        <pre className='flex-1 overflow-auto p-4 text-[13px] leading-relaxed font-mono text-slate-200'>
+        <pre className='flex-1 overflow-auto p-4 text-[13px] leading-relaxed font-mono text-ink-soft'>
           <code>{current.code}</code>
         </pre>
       ) : (

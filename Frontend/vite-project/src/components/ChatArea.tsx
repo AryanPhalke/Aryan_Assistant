@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import api from '../../utils/axios'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ArtifactData, ArtifactDocument } from './Artifact'
 import { Button } from './ui/Button'
-import { cn } from './ui/cn'
+import { ArrowUpIcon, CheckIcon, ChevronDownIcon, StopIcon } from './ui/icons'
 import streamChat from '../features/streamChat'
 
 type Message = {
@@ -15,6 +15,10 @@ type Message = {
 
 type Props = {
   conversationId: string | null
+  // Title of the open chat, shown in the header
+  title?: string
+  // Shown in the greeting of an empty chat
+  userName?: string
   // Creates a conversation when the user sends their first message, returns its id
   ensureConversation: (firstPrompt: string) => Promise<string>
   onOpenArtifact: (artifact: ArtifactData) => void
@@ -92,7 +96,7 @@ function MarkdownLink({ href, title, children }: React.ComponentProps<'a'>) {
         e.preventDefault()
         onOpenArtifact({ document })
       }}
-      className='text-indigo-400 underline underline-offset-2 hover:text-indigo-300'
+      className='text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent'
     >
       {children}
     </a>
@@ -103,31 +107,118 @@ function MarkdownLink({ href, title, children }: React.ComponentProps<'a'>) {
 // service's graph.js; "auto" lets the router decide. `ready: false` marks
 // agents that aren't built yet (they reply with a "not available" message).
 const AGENTS = [
-  { id: 'auto', label: 'Auto', ready: true },
-  { id: 'chat', label: 'Chat', ready: true },
-  { id: 'search', label: 'Search', ready: true },
-  { id: 'coding', label: 'Coding', ready: true },
-  { id: 'pdf', label: 'PDF', ready: true },
-  { id: 'ppt', label: 'Slides', ready: true },
-  { id: 'imageGen', label: 'Image', ready: true },
+  { id: 'auto', label: 'Auto', hint: 'Picks the agent for each message', ready: true },
+  { id: 'chat', label: 'Chat', hint: 'Questions and conversation', ready: true },
+  { id: 'search', label: 'Search', hint: 'Looks things up on the web', ready: true },
+  { id: 'coding', label: 'Coding', hint: 'Writes code with a live preview', ready: true },
+  { id: 'pdf', label: 'PDF', hint: 'Creates a PDF document', ready: true },
+  { id: 'ppt', label: 'Slides', hint: 'Builds a PowerPoint deck', ready: true },
+  { id: 'imageGen', label: 'Image', hint: 'Generates an image', ready: true },
 ]
+
+// Dropdown above the input box for choosing an agent
+function AgentPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const current = AGENTS.find((a) => a.id === value)
+
+  // Clicking elsewhere or pressing Esc closes the menu
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className='relative'>
+      <button
+        type='button'
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        title='Choose an agent'
+        className='h-8 pl-2.5 pr-2 flex items-center gap-1.5 rounded-md text-[13px] text-ink-soft hover:bg-raised hover:text-ink transition-colors cursor-pointer'
+      >
+        {current?.label}
+        <ChevronDownIcon size={14} className='text-muted' />
+      </button>
+
+      {open && (
+        <div className='absolute bottom-full left-0 mb-2 z-30 w-64 p-1 rounded-lg border border-line bg-panel shadow-lg shadow-black/40'>
+          {AGENTS.map((a) => (
+            <button
+              key={a.id}
+              type='button'
+              onClick={() => {
+                onChange(a.id)
+                setOpen(false)
+              }}
+              aria-current={a.id === value}
+              title={a.ready ? undefined : 'This agent is not built yet'}
+              className='w-full px-2.5 py-1.5 flex items-center justify-between gap-3 rounded-md text-left hover:bg-raised transition-colors cursor-pointer'
+            >
+              <span className='min-w-0'>
+                <span className='block text-[13px] text-ink'>
+                  {a.label}
+                  {!a.ready && <span className='ml-1.5 text-[11px] text-muted'>Soon</span>}
+                </span>
+                <span className='block text-[12px] text-muted truncate'>{a.hint}</span>
+              </span>
+              {a.id === value && <CheckIcon size={14} className='shrink-0 text-accent' />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Copies a code block from the chat
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <Button variant='link' className='text-[11px]' onClick={copy}>
+      {copied ? 'Copied' : 'Copy'}
+    </Button>
+  )
+}
+
+const timeOfDay = () => {
+  const hour = new Date().getHours()
+  if (hour < 5 || hour >= 18) return 'Good evening'
+  return hour < 12 ? 'Good morning' : 'Good afternoon'
+}
 
 // Tailwind styles for each Markdown element in AI replies
 // (code blocks are handled separately so they keep the "Open" button)
 const markdownComponents: Components = {
-  h1: ({ children }) => <h1 className='text-[20px] font-semibold text-slate-100 mt-4 mb-2'>{children}</h1>,
-  h2: ({ children }) => <h2 className='text-[17px] font-semibold text-slate-100 mt-4 mb-2'>{children}</h2>,
-  h3: ({ children }) => <h3 className='text-[15px] font-semibold text-slate-100 mt-3 mb-1.5'>{children}</h3>,
-  p: ({ children }) => <p className='my-2'>{children}</p>,
-  strong: ({ children }) => <strong className='font-semibold text-slate-100'>{children}</strong>,
-  ul: ({ children }) => <ul className='list-disc pl-5 my-2 flex flex-col gap-1 marker:text-slate-500'>{children}</ul>,
-  ol: ({ children }) => <ol className='list-decimal pl-5 my-2 flex flex-col gap-1 marker:text-slate-500'>{children}</ol>,
+  h1: ({ children }) => <h1 className='text-[22px] font-semibold tracking-tight text-ink mt-6 mb-2'>{children}</h1>,
+  h2: ({ children }) => <h2 className='text-[18px] font-semibold tracking-tight text-ink mt-5 mb-2'>{children}</h2>,
+  h3: ({ children }) => <h3 className='text-[15px] font-semibold text-ink mt-4 mb-1.5'>{children}</h3>,
+  p: ({ children }) => <p className='my-2.5'>{children}</p>,
+  strong: ({ children }) => <strong className='font-semibold text-ink'>{children}</strong>,
+  ul: ({ children }) => <ul className='list-disc pl-5 my-2.5 flex flex-col gap-1 marker:text-muted'>{children}</ul>,
+  ol: ({ children }) => <ol className='list-decimal pl-5 my-2.5 flex flex-col gap-1 marker:text-muted'>{children}</ol>,
   a: ({ href, title, children }) => (
     <MarkdownLink href={href} title={title}>
       {children}
     </MarkdownLink>
   ),
-  blockquote: ({ children }) => <blockquote className='border-l-2 border-white/15 pl-3 my-2 text-slate-400'>{children}</blockquote>,
+  blockquote: ({ children }) => <blockquote className='border-l-2 border-line-strong pl-3 my-2.5 text-muted'>{children}</blockquote>,
   hr: () => <hr className='my-4 border-line' />,
   // Generated images (imageGen agent); click opens the full size in a new tab.
   // Images in S3 are saved as "/api/agent/files/..." paths on the gateway.
@@ -139,25 +230,25 @@ const markdownComponents: Components = {
           src={url}
           alt={alt}
           loading='lazy'
-          className='max-w-full sm:max-w-md rounded-xl border border-line bg-white/4 aspect-square object-cover'
+          className='max-w-full sm:max-w-md rounded-lg border border-line bg-panel aspect-square object-cover'
         />
       </a>
     )
   },
   // Inline `code`
-  code: ({ children }) => <code className='px-1.5 py-0.5 rounded bg-white/8 text-[13px] font-mono text-slate-100'>{children}</code>,
+  code: ({ children }) => <code className='px-1 py-0.5 rounded bg-raised text-[13px] font-mono text-ink'>{children}</code>,
   table: ({ children }) => (
-    <div className='my-3 overflow-x-auto rounded-xl border border-line'>
+    <div className='my-3 overflow-x-auto rounded-lg border border-line'>
       <table className='w-full text-left text-[13px] border-collapse'>{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className='bg-white/4 text-slate-100'>{children}</thead>,
-  th: ({ children }) => <th className='px-3 py-2 font-semibold border-b border-line'>{children}</th>,
+  thead: ({ children }) => <thead className='bg-panel text-ink'>{children}</thead>,
+  th: ({ children }) => <th className='px-3 py-2 font-medium border-b border-line'>{children}</th>,
   td: ({ children }) => <td className='px-3 py-2 border-t border-line-soft align-top'>{children}</td>,
 }
 
 // Main chat panel: message list + input box.
-function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props) {
+function ChatArea({ conversationId, title, userName, ensureConversation, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   // loading = a reply is in progress; waiting = no text has arrived yet
@@ -166,6 +257,7 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
   const [waiting, setWaiting] = useState(false)
   const [agent, setAgent] = useState('auto')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   // Lets the Stop button (or switching chats) cancel the stream
   const abortRef = useRef<AbortController | null>(null)
   // Set while we create a conversation mid-send, so the effect below doesn't
@@ -201,6 +293,14 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  // Grow the input box with its text (up to its max height)
+  useLayoutEffect(() => {
+    const box = inputRef.current
+    if (!box) return
+    box.style.height = 'auto'
+    box.style.height = `${box.scrollHeight}px`
+  }, [input])
 
   const send = async () => {
     const prompt = input.trim()
@@ -279,24 +379,32 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
     }
   }
 
+  const isEmpty = messages.length === 0 && !loading
+
   return (
     <main className='flex-1 min-w-0 h-full flex flex-col'>
+      <header className='shrink-0 h-12 flex items-center px-6 border-b border-line-soft'>
+        <h1 className='text-[13px] font-medium text-ink-soft truncate'>{title || 'New chat'}</h1>
+      </header>
+
       <div className='flex-1 overflow-y-auto'>
-        {messages.length === 0 && !loading ? (
-          <div className='h-full flex flex-col items-center justify-center gap-2 px-6 text-center'>
-            <h1 className='text-[26px] font-semibold tracking-tight text-slate-100'>How can I help you today?</h1>
-            <p className='text-[14px] text-slate-500'>Ask a question, write some code, or search the web.</p>
+        {isEmpty ? (
+          <div className='h-full max-w-3xl mx-auto px-6 pb-6 flex flex-col justify-end gap-1.5'>
+            <h2 className='text-[30px] font-semibold tracking-tight text-ink'>
+              {timeOfDay()}{userName ? `, ${userName.split(' ')[0]}` : ''}
+            </h2>
+            <p className='text-[15px] text-muted'>Ask a question, write some code, or search the web.</p>
           </div>
         ) : (
           <div className='max-w-3xl mx-auto px-6 py-8 flex flex-col gap-6'>
             {messages.map((m, i) => (
               <div key={m._id ?? i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 {m.role === 'user' ? (
-                  <div className='max-w-[80%] px-4 py-2.5 rounded-2xl bg-indigo-500/20 text-[14px] text-slate-100 whitespace-pre-wrap'>
+                  <div className='max-w-[80%] px-3.5 py-2 rounded-xl bg-raised text-[15px] leading-[1.6] text-ink whitespace-pre-wrap'>
                     {m.content}
                   </div>
                 ) : (
-                  <div className='w-full text-[14px] leading-relaxed text-slate-300 flex flex-col gap-1'>
+                  <div className='w-full text-[15px] leading-[1.7] text-ink-soft flex flex-col gap-1'>
                     {splitCodeBlocks(m.content ?? '').map((part, j) =>
                       part.type === 'text' ? (
                         <OpenArtifactContext.Provider key={j} value={onOpenArtifact}>
@@ -305,21 +413,24 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
                           </ReactMarkdown>
                         </OpenArtifactContext.Provider>
                       ) : (
-                        <div key={j} className='my-2 rounded-xl border border-line bg-panel overflow-hidden'>
-                          <div className='flex items-center justify-between px-3 h-8 border-b border-line-soft'>
-                            <span className='text-[11px] font-mono text-slate-500'>{part.fileName || part.language || 'code'}</span>
-                            <Button
-                              variant='link'
-                              className='text-[11px]'
-                              onClick={() => {
-                                const artifact = toArtifact(m.content ?? '', j)
-                                if (artifact) onOpenArtifact(artifact)
-                              }}
-                            >
-                              Open
-                            </Button>
+                        <div key={j} className='my-2.5 rounded-lg border border-line bg-sidebar overflow-hidden'>
+                          <div className='flex items-center justify-between gap-3 pl-3 pr-3 h-8 border-b border-line-soft'>
+                            <span className='min-w-0 truncate text-[11px] font-mono text-muted'>{part.fileName || part.language || 'code'}</span>
+                            <div className='flex items-center gap-3 shrink-0'>
+                              <CopyButton text={part.content} />
+                              <Button
+                                variant='link'
+                                className='text-[11px]'
+                                onClick={() => {
+                                  const artifact = toArtifact(m.content ?? '', j)
+                                  if (artifact) onOpenArtifact(artifact)
+                                }}
+                              >
+                                Open
+                              </Button>
+                            </div>
                           </div>
-                          <pre className='p-3 overflow-x-auto text-[13px] font-mono'><code>{part.content}</code></pre>
+                          <pre className='p-3 overflow-x-auto text-[13px] leading-relaxed font-mono'><code>{part.content}</code></pre>
                         </div>
                       ),
                     )}
@@ -330,11 +441,7 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
 
             {/* Typing indicator until the first words of the reply arrive */}
             {waiting && (
-              <div className='flex gap-1.5 py-2'>
-                <span className='w-2 h-2 rounded-full bg-slate-500 animate-bounce' />
-                <span className='w-2 h-2 rounded-full bg-slate-500 animate-bounce [animation-delay:150ms]' />
-                <span className='w-2 h-2 rounded-full bg-slate-500 animate-bounce [animation-delay:300ms]' />
-              </div>
+              <span role='status' aria-label='Writing a reply' className='block w-2 h-4 bg-accent animate-pulse motion-reduce:animate-none' />
             )}
             <div ref={bottomRef} />
           </div>
@@ -342,53 +449,38 @@ function ChatArea({ conversationId, ensureConversation, onOpenArtifact }: Props)
       </div>
 
       {/* Input box */}
-      <div className='px-6 pb-6'>
-        <div className='max-w-3xl mx-auto flex flex-col gap-1 p-2 rounded-2xl bg-panel border border-line focus-within:border-white/16 transition-colors'>
-          {/* Agent picker */}
-          <div className='flex flex-wrap gap-1.5 px-1 pt-1'>
-            {AGENTS.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => setAgent(a.id)}
-                title={a.ready ? undefined : 'This agent is not built yet'}
-                className={cn(
-                  'h-7 px-3 flex items-center gap-1.5 rounded-full text-[12px] border transition-colors cursor-pointer',
-                  agent === a.id
-                    ? 'bg-white text-slate-900 border-white'
-                    : 'border-line text-slate-400 hover:bg-white/5 hover:text-slate-200',
-                )}
-              >
-                {a.label}
-                {!a.ready && (
-                  <span className={cn('text-[10px]', agent === a.id ? 'text-slate-500' : 'text-slate-600')}>Soon</span>
-                )}
-              </button>
-            ))}
-          </div>
+      <div className='w-full max-w-3xl mx-auto px-6 pb-3'>
+        <div className='flex flex-col rounded-xl bg-panel border border-line focus-within:border-line-strong transition-colors'>
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            aria-label='Message'
+            placeholder='Message Aryan’s Assistant...'
+            className='w-full max-h-40 resize-none bg-transparent px-3.5 pt-3 pb-1 text-[15px] text-ink placeholder:text-faint outline-none'
+          />
 
-          <div className='flex items-end gap-2'>
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              placeholder='Message Aryan’s Assistant...'
-              className='flex-1 max-h-40 resize-none bg-transparent px-2 py-2 text-[14px] text-slate-100 placeholder:text-slate-600 outline-none'
-            />
+          <div className='flex items-center justify-between p-1.5'>
+            <AgentPicker value={agent} onChange={setAgent} />
             {/* While a reply is streaming, Send becomes Stop */}
             {loading ? (
-              <Button variant='outline' onClick={stop} className='h-9 px-4'>
-                Stop
+              <Button variant='outline' onClick={stop} title='Stop' aria-label='Stop' className='w-8 h-8 p-0'>
+                <StopIcon size={14} />
               </Button>
             ) : (
-              <Button onClick={send} disabled={!input.trim()}>
-                Send
+              <Button onClick={send} disabled={!input.trim()} title='Send' aria-label='Send' className='w-8 h-8 p-0'>
+                <ArrowUpIcon />
               </Button>
             )}
           </div>
         </div>
-        <p className='mt-2 text-center text-[11px] text-slate-600'>AI can make mistakes. Check important info.</p>
+        <p className='mt-2 text-center text-[11px] text-muted'>AI can make mistakes. Check important info.</p>
       </div>
+
+      {/* Empty chat: this spacer lifts the greeting and input box to mid-screen */}
+      {isEmpty && <div className='flex-1' />}
     </main>
   )
 }

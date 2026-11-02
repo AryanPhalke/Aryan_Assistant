@@ -6,13 +6,13 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 }
 
 const variants = {
-  // Solid white: Send, Continue with Google
+  // Solid accent: Send
   primary:
-    'h-9 px-4 rounded-xl bg-white text-[13px] font-medium text-slate-900 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed',
-  // Bordered: New chat
-  outline: 'h-10 px-3 rounded-xl border border-line text-[13px] font-medium text-slate-200 hover:bg-white/5',
-  // Plain text: Copy, Download, Open, Log out
-  link: 'text-[12px] text-slate-400 hover:text-slate-100',
+    'h-9 px-4 rounded-lg bg-accent text-[13px] font-medium text-on-accent hover:bg-accent-strong disabled:bg-raised disabled:text-faint disabled:cursor-not-allowed',
+  // Bordered: New chat, Continue with Google, Stop
+  outline: 'h-9 px-3 rounded-lg border border-line text-[13px] font-medium text-ink hover:bg-raised',
+  // Plain text: Copy, Download, Open
+  link: 'text-[12px] text-muted hover:text-ink',
 }
 
 // Text button. Pass `className` to adjust size/layout; it overrides the
@@ -34,7 +34,7 @@ export function IconButton({ className, type = 'button', ...props }: ButtonHTMLA
     <button
       type={type}
       className={cn(
-        'w-7 h-7 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white/6 hover:text-slate-100 transition-colors cursor-pointer',
+        'w-8 h-8 shrink-0 flex items-center justify-center rounded-md text-muted hover:bg-raised hover:text-ink transition-colors cursor-pointer',
         className,
       )}
       {...props}

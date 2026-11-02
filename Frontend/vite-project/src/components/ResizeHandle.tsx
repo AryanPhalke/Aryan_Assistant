@@ -67,7 +67,7 @@ function ResizeHandle({
       <div
         className={cn(
           'mx-auto h-full w-0.5 transition-colors',
-          dragging ? 'bg-indigo-400' : 'bg-transparent group-hover:bg-indigo-400/60',
+          dragging ? 'bg-accent' : 'bg-transparent group-hover:bg-line-strong',
         )}
       />
     </div>

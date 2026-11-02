@@ -11,15 +11,10 @@ import Artifact, { type ArtifactData } from '../components/Artifact'
 import ResizeHandle from '../components/ResizeHandle'
 import { ARTIFACT, MIN_CHAT, SIDEBAR, STRIP_WIDTH } from '../components/layout'
 import { Button, IconButton } from '../components/ui/Button'
-import { VerticalLabel } from '../components/ui/VerticalLabel'
+import { FilesIcon, PanelLeftIcon, PlusIcon } from '../components/ui/icons'
 import { cn } from '../components/ui/cn'
 
 type Conversation = { _id: string; title: string }
-
-// Clickable area of a collapsed strip ("Chats ›" / "‹ Artifacts")
-const stripButton =
-  'flex flex-col items-center justify-center gap-3 text-slate-500 hover:text-slate-200 hover:bg-white/3 transition-colors cursor-pointer'
-
 
 // Landing page. Shows a "Login with Google" popup until the user is logged in,
 // then the chat layout: sidebar | chat | (optional) artifact panel.
@@ -39,10 +34,15 @@ function Home() {
   const [artifactWidth, setArtifactWidth] = useState(ARTIFACT.default)
 
   // Sidebar: open/collapsed, width (changed by dragging its right edge), and
-  // whether it's being dragged (to dim it near the collapse point)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // whether it's being dragged (to dim it near the collapse point).
+  // Open/collapsed is remembered between visits.
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false')
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR.default)
   const [sidebarDragging, setSidebarDragging] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', String(sidebarOpen))
+  }, [sidebarOpen])
 
   // Each panel can only grow until the chat in the middle hits MIN_CHAT
   const sidebarSpace = sidebarOpen ? sidebarWidth : STRIP_WIDTH
@@ -137,15 +137,15 @@ function Home() {
     await handleLogin(token);
   }
   return (
-    <div className='h-screen flex bg-app text-white overflow-hidden'>
-{!userData && <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur'>
-        <div className='w-85 bg-panel border border-line rounded-2xl p-7 flex flex-col gap-5'>
-          <div className='flex flex-col gap-1'>
-            <h2 className='text-[17px] font-semibold text-slate-100 tracking-tight'>Welcome to Aryan&apos;s Assistant</h2>
-            <p className='text-[13px] text-slate-500'>Please login to continue using the app.</p>
+    <div className='h-screen flex bg-app text-ink overflow-hidden'>
+{!userData && <div className='fixed inset-0 z-50 flex items-center justify-center bg-app'>
+        <div className='w-85 flex flex-col gap-6'>
+          <div className='flex flex-col gap-1.5'>
+            <h2 className='text-[24px] font-semibold text-ink tracking-tight'>Aryan&rsquo;s Assistant</h2>
+            <p className='text-[14px] text-muted'>Sign in to pick up your conversations.</p>
           </div>
 
-          <Button onClick={googleLogin} className='w-full h-11 gap-3 text-[14px]'>
+          <Button variant='outline' onClick={googleLogin} className='w-full h-11 gap-3 text-[14px] bg-panel'>
             <svg width='18' height='18' viewBox='0 0 48 48'>
               <path fill='#EA4335' d='M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z'/>
               <path fill='#4285F4' d='M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z'/>
@@ -170,6 +170,7 @@ function Home() {
                 onSelect={selectConversation}
                 onNewChat={startNewChat}
                 onDelete={deleteConversation}
+                onCollapse={() => setSidebarOpen(false)}
                 user={userData}
                 onLogout={logout}
               />
@@ -188,27 +189,24 @@ function Home() {
               />
             </div>
           ) : (
-            // Collapsed: a slim strip on the left edge with "new chat" and a
-            // button that opens the sidebar again
+            // Collapsed: a slim strip on the left edge with a button that opens
+            // the sidebar again and "new chat"
             <div
               style={{ width: STRIP_WIDTH }}
-              className='shrink-0 h-full flex flex-col items-center border-r border-line-soft bg-sidebar'
+              className='shrink-0 h-full flex flex-col items-center gap-1 pt-2 border-r border-line-soft bg-sidebar'
             >
-              <IconButton
-                onClick={startNewChat}
-                title='New chat'
-                className='mt-3 w-8 h-8 border border-line text-[16px] text-slate-300 hover:bg-white/5'
-              >
-                +
+              <IconButton onClick={() => setSidebarOpen(true)} title='Open chats'>
+                <PanelLeftIcon />
               </IconButton>
-              <button onClick={() => setSidebarOpen(true)} title='Open chats' className={cn(stripButton, 'flex-1 w-full')}>
-                <VerticalLabel>Chats</VerticalLabel>
-                <span className='text-[14px]'>›</span>
-              </button>
+              <IconButton onClick={startNewChat} title='New chat'>
+                <PlusIcon />
+              </IconButton>
             </div>
           )}
           <ChatArea
             conversationId={activeId}
+            title={conversations.find((c) => c._id === activeId)?.title}
+            userName={userData.name}
             ensureConversation={ensureConversation}
             onOpenArtifact={openArtifact}
           />
@@ -233,12 +231,13 @@ function Home() {
               onClick={() => setArtifactOpen(true)}
               title='Open artifacts'
               style={{ width: STRIP_WIDTH }}
-              className={cn(stripButton, 'shrink-0 h-full border-l border-line-soft bg-sidebar')}
+              className='group shrink-0 h-full flex flex-col items-center pt-2 border-l border-line-soft bg-sidebar text-muted hover:text-ink transition-colors cursor-pointer'
             >
-              <span className='text-[14px]'>‹</span>
-              <VerticalLabel>Artifacts</VerticalLabel>
-              {/* Dot = something is ready to view */}
-              {artifact && <span className='w-1.5 h-1.5 rounded-full bg-indigo-400' />}
+              <span className='relative w-8 h-8 flex items-center justify-center rounded-md group-hover:bg-raised transition-colors'>
+                <FilesIcon />
+                {/* Dot = something is ready to view */}
+                {artifact && <span className='absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent' />}
+              </span>
             </button>
           )}
         </>
