@@ -145,9 +145,16 @@ Dashed arrows are failure and fallback paths. Select an agent to see its flow.
 
 ## Scaling to 1 million users
 
-The current setup runs one copy of each service, one Redis container and one
-MongoDB database. The design below shows how it would grow to about one million
-users (planning estimate: ~15k people online at peak, ~500 messages a second).
+Both diagrams use the same layout, so each box in step 2 replaces the box in
+the same place in step 1. PNG copies sit next to the SVGs in `docs/diagrams/`.
+
+**Step 1: current architecture.** One copy of each service, one Redis container
+and one MongoDB database. Red dashed boxes are the gaps.
+
+![Current architecture: users call one gateway directly; one copy of each service; agent runs, Puppeteer and streaming happen inside the agent process; one Redis and one MongoDB](docs/diagrams/current-architecture.svg)
+
+**Step 2: refined for about one million users** (planning estimate: ~15k people
+online at peak, ~500 messages a second).
 
 ![Design for one million users: CDN and load balancer, autoscaled stateless services, a job queue with LLM and file workers, Redis and MongoDB clusters, S3 and an LLM gateway](docs/diagrams/scale-1m.svg)
 
