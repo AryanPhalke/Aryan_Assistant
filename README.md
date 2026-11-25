@@ -47,6 +47,12 @@ the web, write code with a live preview, or create PDFs, slide decks and images.
 
 ![System map: the browser, gateway, services, data stores and external providers](docs/diagrams/system.svg)
 
+### End-to-end flowchart
+
+Sign-in, sending a message, the agent graph, and how the reply is saved and shown.
+
+![End-to-end flowchart: sign in, send a message, agent graph, save and show the reply](docs/diagrams/overview.svg)
+
 - **Gateway:** the only server the browser talks to. It handles CORS and cookies,
   checks the session on private routes, and forwards requests to the services
   with the user's id in a header.
@@ -136,6 +142,27 @@ Dashed arrows are failure and fallback paths. Select an agent to see its flow.
    Redis before letting the request through.
 
 ![Login flow, and how a page reload restores the user](docs/diagrams/login.svg)
+
+## Scaling to 1 million users
+
+The current setup runs one copy of each service, one Redis container and one
+MongoDB database. The design below shows how it would grow to about one million
+users (planning estimate: ~15k people online at peak, ~500 messages a second).
+
+![Design for one million users: CDN and load balancer, autoscaled stateless services, a job queue with LLM and file workers, Redis and MongoDB clusters, S3 and an LLM gateway](docs/diagrams/scale-1m.svg)
+
+1. The React app is served from a CDN; API calls go through a global load
+   balancer with a WAF and per-IP rate limits.
+2. Gateway, auth, chat and agent API pods hold no state, so they scale out
+   behind the load balancer.
+3. The agent API puts each run on a job queue instead of running it in the web
+   pod. LLM workers and a separate Puppeteer pool for PDFs and decks scale on
+   queue depth.
+4. Workers publish tokens to Redis pub/sub, and whichever pod holds the user's
+   SSE stream forwards them.
+5. Redis becomes a cluster, MongoDB is sharded by `userId`, and an LLM gateway
+   spreads load across provider keys, fails over between providers and enforces
+   per-user token budgets.
 
 ## Project structure
 
